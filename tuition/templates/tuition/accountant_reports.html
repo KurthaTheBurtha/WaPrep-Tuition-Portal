@@ -1,0 +1,305 @@
+{% extends 'tuition/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Year Selector -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="get" class="d-flex align-items-center">
+                        <label for="year" class="form-label mb-0 me-2">Select Year:</label>
+                        <select name="year" id="year" class="form-select" style="width: auto;" onchange="this.form.submit()">
+                            {% for year in available_years %}
+                            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row mb-4 g-3">
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-dollar-sign text-success fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Payments ({{ selected_year }})</h6>
+                            <h2 class="card-title mb-0">${{ total_amount|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-chart-line text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Transactions</h6>
+                            <h2 class="card-title mb-0">{{ payments|length }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Breakdown -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Monthly Breakdown</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="border-0 ps-4">Month</th>
+                                    <th class="border-0">Total Amount</th>
+                                    <th class="border-0">Number of Payments</th>
+                                    <th class="border-0 text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month, data in monthly_totals.items %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <h6 class="mb-0">{{ month|date:"F" }}</h6>
+                                    </td>
+                                    <td>
+                                        <span class="text-success">${{ data.total|floatformat:2 }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary bg-opacity-10 text-primary">
+                                            {{ data.count }} payments
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#monthDetailsModal"
+                                                data-month="{{ month|date:'F' }}"
+                                                data-year="{{ selected_year }}">
+                                            <i class="fas fa-eye me-1"></i> View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Payments -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Recent Payments</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="border-0 ps-4">Date</th>
+                                    <th class="border-0">Student</th>
+                                    <th class="border-0">Amount</th>
+                                    <th class="border-0">Status</th>
+                                    <th class="border-0 text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td class="ps-4">{{ payment.payment_date|date:"M d, Y" }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle bg-primary bg-opacity-10 text-primary me-2">
+                                                {{ payment.student.first_name|first }}{{ payment.student.last_name|first }}
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0">{{ payment.student.first_name }} {{ payment.student.last_name }}</h6>
+                                                <small class="text-muted">ID: {{ payment.student.student_id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-success">${{ payment.amount|floatformat:2 }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %} bg-opacity-10 {% if payment.status == 'completed' %}text-success{% elif payment.status == 'pending' %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ payment.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <a href="{% url 'tuition:download_receipt' payment.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-download me-1"></i> Receipt
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="text-muted">
+                                            <div class="mb-3">
+                                                <i class="fas fa-receipt fa-3x"></i>
+                                            </div>
+                                            <h5>No Payments Found</h5>
+                                            <p class="mb-0">No payments have been recorded for {{ selected_year }}</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Month Details Modal -->
+<div class="modal fade" id="monthDetailsModal" tabindex="-1" aria-labelledby="monthDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="monthDetailsModalLabel">Month Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="border-0 ps-4">Date</th>
+                                <th class="border-0">Student</th>
+                                <th class="border-0">Amount</th>
+                                <th class="border-0">Status</th>
+                                <th class="border-0 text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthDetailsBody">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .table th {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.875rem;
+    }
+
+    .table td {
+        vertical-align: middle;
+    }
+
+    .btn-sm {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+    }
+
+    .card {
+        border: none;
+        border-radius: 0.75rem;
+    }
+
+    .card-header {
+        border-bottom: 1px solid rgba(0, 0, 0, .05);
+        background-color: transparent;
+    }
+
+    .badge {
+        padding: 0.5em 0.75em;
+        font-weight: 500;
+    }
+
+    .form-control,
+    .form-select {
+        padding: 0.6rem 1rem;
+        border-radius: 0.5rem;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--bs-primary);
+        box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Month details modal handler
+        const monthDetailsModal = document.getElementById('monthDetailsModal');
+        if (monthDetailsModal) {
+            monthDetailsModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const month = button.getAttribute('data-month');
+                const year = button.getAttribute('data-year');
+                
+                // Update modal title
+                document.getElementById('monthDetailsModalLabel').textContent = `${month} ${year} Details`;
+                
+                // Filter payments for the selected month
+                const monthPayments = Array.from(document.querySelectorAll('table tbody tr')).filter(row => {
+                    const dateCell = row.querySelector('td:first-child');
+                    if (!dateCell) return false;
+                    const date = new Date(dateCell.textContent);
+                    return date.getMonth() === new Date(`${month} 1, ${year}`).getMonth() &&
+                           date.getFullYear() === parseInt(year);
+                });
+                
+                // Update modal body
+                const modalBody = document.getElementById('monthDetailsBody');
+                modalBody.innerHTML = monthPayments.length ? 
+                    monthPayments.map(row => row.outerHTML).join('') :
+                    `<tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="text-muted">
+                                <div class="mb-3">
+                                    <i class="fas fa-receipt fa-3x"></i>
+                                </div>
+                                <h5>No Payments Found</h5>
+                                <p class="mb-0">No payments have been recorded for ${month} ${year}</p>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+        }
+    });
+</script>
+{% endblock %} 

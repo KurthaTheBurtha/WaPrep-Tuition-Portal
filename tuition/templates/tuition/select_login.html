@@ -1,0 +1,66 @@
+{% extends 'tuition/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    body, html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    .landing-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        min-height: 100vh;
+        background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+                    url("{% static 'tuition/images/studentstogether.jpg' %}") no-repeat center center;
+        background-size: cover;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 0;
+        height: 100vh;
+        width: 100%;
+    }
+    .landing-card {
+        max-width: 400px;
+        width: 100%;
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+        padding: 2.5rem 2rem;
+        z-index: 1;
+        position: relative;
+    }
+    .landing-title {
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    @media (max-width: 576px) {
+        .landing-card {
+            padding: 1.5rem 0.5rem;
+        }
+        .landing-title {
+            font-size: 1rem;
+        }
+    }
+    /* Hide the footer on the landing page */
+    footer { display: none !important; }
+    nav.navbar { display: none !important; }
+</style>
+<div class="landing-bg">
+    <div class="landing-card">
+        <h2 class="landing-title">Welcome to the Washington Preparatory School Portal</h2>
+        <div class="d-grid gap-3">
+            <a href="{% url 'tuition:parent_login' %}" class="btn btn-primary btn-lg">Parent Login</a>
+            <a href="{% url 'tuition:accountant_login' %}" class="btn btn-outline-secondary btn-lg">Accountant Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %} 
