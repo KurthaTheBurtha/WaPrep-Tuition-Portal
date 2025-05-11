@@ -38,6 +38,26 @@ def parent_login(request):
     
     return render(request, 'tuition/parent_login.html', {'hide_nav_items': True})
 
+def parent_signup(request):
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if User.objects.filter(email=email).exists():
+            messages.error(request, "An account with this email already exists.")
+        else:
+            user = User.objects.create_user(username=email, first_name=first_name, last_name=last_name, email=email, password=password)
+            user.user_type = 'parent'
+            user.save()
+            login(request, user)
+            messages.success(request, "Account created successfully.")
+            return redirect('tuition:parent_dashboard')
+
+    return render(request, 'tuition/parent_signup.html')
+
 def accountant_login(request):
     if request.method == 'POST':
         email = request.POST.get('email')
@@ -180,45 +200,36 @@ def students(request):
     }
     return render(request, 'tuition/students.html', context)
 
-def get_phone_keypad_number(letter):
-    """Convert a letter to its corresponding number on a phone keypad."""
-    letter = letter.lower()
-    if letter in 'abc':
-        return '2'
-    elif letter in 'def':
-        return '3'
-    elif letter in 'ghi':
-        return '4'
-    elif letter in 'jkl':
-        return '5'
-    elif letter in 'mno':
-        return '6'
-    elif letter in 'pqrs':
-        return '7'
-    elif letter in 'tuv':
-        return '8'
-    elif letter in 'wxyz':
-        return '9'
-    return '0'  # Default for any other character
-
 def generate_student_id(first_name, last_name, birthday):
-    """Generate a student ID in the format ##mmddyyyy."""
-    # Get first letter of first and last name
-    first_letter = first_name[0] if first_name else '0'
-    last_letter = last_name[0] if last_name else '0'
-    
-    # Convert letters to numbers
-    first_num = get_phone_keypad_number(first_letter)
-    last_num = get_phone_keypad_number(last_letter)
-    
-    # Format birthday as mmddyyyy
+    """
+    Generate a unique student ID in the format #XXMMDDYYYY:
+    - # is a digit 0-9 (random, but must ensure uniqueness)
+    - XX is first and last initial (uppercase)
+    - MMDDYYYY is birth date
+    """
+    first_initial = (first_name[0] if first_name else 'X').upper()
+    last_initial = (last_name[0] if last_name else 'X').upper()
+    initials = f"{first_initial}{last_initial}"
+
+    # Format birthday
     try:
         birthday_str = birthday.strftime('%m%d%Y')
-    except:
-        birthday_str = '00000000'  # Default if birthday is invalid
-    
-    # Combine to form ID
-    return f"{first_num}{last_num}{birthday_str}"
+    except Exception:
+        birthday_str = '00000000'
+
+    base_id = f"{initials}{birthday_str}"
+
+    # Ensure unique ID by randomizing the leading digit
+    tried_digits = set()
+    while len(tried_digits) < 10:
+        leading_digit = str(random.randint(0, 9))
+        full_id = f"{leading_digit}{base_id}"
+        if not Student.objects.filter(student_id=full_id).exists():
+            return full_id
+        tried_digits.add(int(leading_digit))
+
+    # If all 10 digits have been tried and are taken, fallback
+    raise ValueError("Unable to generate a unique student ID after 10 attempts.")
 
 @login_required
 def add_student(request):
@@ -250,13 +261,14 @@ def add_student(request):
             )
 
             # Add parent relationship
-            parent = User.objects.get(id=parent_id)
-            StudentParent.objects.create(
-                student=student,
-                parent=parent,
-                relationship=relationship,
-                is_primary=is_primary
-            )
+            if parent_id:
+                parent = User.objects.get(id=parent_id)
+                StudentParent.objects.create(
+                    student=student,
+                    parent=parent,
+                    relationship=relationship,
+                    is_primary=is_primary
+                )
 
             messages.success(request, 'Student added successfully')
         except Exception as e:
@@ -269,14 +281,14 @@ def add_student(request):
 @login_required
 def delete_student(request):
     # Only allow parent users
-    if request.user.user_type != 'parent':
+    if request.user.user_type != 'accountant':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('tuition:home')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
         try:
-            student = get_object_or_404(Student, id=student_id, parent=request.user)
+            student = get_object_or_404(Student, id=student_id)
             student_name = f"{student.first_name} {student.last_name}"
             student.delete()
             messages.success(request, f'Student {student_name} deleted successfully.')
@@ -468,9 +480,8 @@ def parent_dashboard(request):
         )
     
     # Get students already associated with this parent
-    my_students = Student.objects.filter(
-        studentparent__parent=request.user
-    ).order_by('first_name', 'last_name')
+    my_students = Student.objects.filter(studentparent__parent=request.user).distinct()
+
     
     context = {
         'available_students': available_students,
@@ -486,7 +497,9 @@ def add_student_to_parent(request):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('tuition:parent_login')
     
+
     if request.method == 'POST':
+        print("POST to add_student_to_parent received:", request.POST)
         student_id = request.POST.get('student_id')
         relationship = request.POST.get('relationship', 'other')
         is_primary = request.POST.get('is_primary', False) == 'on'
@@ -494,6 +507,11 @@ def add_student_to_parent(request):
         try:
             student = get_object_or_404(Student, id=student_id)
             
+            # Check if the student is already linked to this parent
+            if StudentParent.objects.filter(student=student, parent=request.user).exists():
+                messages.warning(request, f'{student.first_name} {student.last_name} is already linked to your account.')
+                return redirect('tuition:parent_dashboard')
+
             # If this is set as primary, unset any existing primary parent
             if is_primary:
                 StudentParent.objects.filter(student=student, is_primary=True).update(is_primary=False)

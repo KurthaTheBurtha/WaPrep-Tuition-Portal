@@ -6,7 +6,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-10 col-lg-8">
             <div class="login-box mt-5">
-                <h2 class="text-center mb-4">Parent Login</h2>
+                <h2 class="text-center mb-4">Sign Up</h2>
                 
                 {% if messages %}
                 <div class="messages">
@@ -18,41 +18,36 @@
                 </div>
                 {% endif %}
 
-                <form method="post" action="{% url 'tuition:parent_login' %}">
+                <form method="post">
                     {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="first_name" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="last_name" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" required>
+                    </div>
+
                     <div class="mb-3">
                         <label for="email" class="form-label">Email Address</label>
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password" name="password" required>
                     </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                        <label class="form-check-label" for="remember">Remember me</label>
-                    </div>
-                    
+
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Login</button>
+                        <button type="submit" class="btn btn-primary">Create Account</button>
                     </div>
                 </form>
-                
-                <div class="text-center mt-3">
-                    <a href="{% url 'tuition:forgot_password' %}" class="text-decoration-none">Forgot Password?</a>
-                </div>
 
                 <div class="text-center mt-3">
-                    <p class="mb-0">Are you an accountant? <a href="{% url 'tuition:accountant_login' %}" class="text-decoration-none">Login here</a></p>
+                    <p class="mb-0">Already have an account? <a href="{% url 'tuition:parent_login' %}" class="text-decoration-none">Login</a></p>
                 </div>
-                
-                <div class="text-center mt-3">
-                    <p class="mb-0">Don't have an account? <a href="{% url 'tuition:parent_signup' %}" class="text-decoration-none">Sign up here</a></p>
-                </div>
-                
-                
             </div>
         </div>
     </div>
@@ -86,9 +81,10 @@
         border-radius: 5px;
         margin-bottom: 1rem;
     }
-    .container{
+
+    .container {
         background-color: transparent;
         box-shadow: none;
     }
 </style>
-{% endblock %} 
+{% endblock %}

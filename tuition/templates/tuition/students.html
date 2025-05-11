@@ -563,6 +563,16 @@
                 document.getElementById('remove_parent_name').textContent = button.getAttribute('data-parent-name');
             });
         }
+
+        // default date of birth to 16 years ago (for convenience)
+        const today = new Date(); 
+        const sixteenYearsAgo = new Date(today.getFullYear() - 14, today.getMonth(), today.getDate());
+        const formatted = sixteenYearsAgo.toISOString().split('T')[0];
+
+        const dobInput = document.getElementById('date_of_birth');
+        if (dobInput && !dobInput.value) {
+            dobInput.value = formatted;
+        }
     });
 </script>
 {% endblock %}

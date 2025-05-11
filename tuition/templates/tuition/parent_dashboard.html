@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block content %}
+
 <div class="container-fluid py-4">
     <!-- My Students Section -->
     <div class="row mb-4">
@@ -45,7 +46,7 @@
                                         </span>
                                     </td>
                                     <td>
-                                        {% with relationship=student.studentparent_set.get %}
+                                        {% with relationship=student.studentparent_set.first %}
                                         <span class="badge bg-info bg-opacity-10 text-info">
                                             {{ relationship.get_relationship_display }}
                                             {% if relationship.is_primary %}(Primary){% endif %}
@@ -159,7 +160,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block modals %}
 <!-- Add Student Modal -->
 <div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -254,19 +257,11 @@
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Add Student Modal handler
-        const addStudentModal = document.getElementById('addStudentModal');
-        if (addStudentModal) {
-            addStudentModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-                const studentId = button.getAttribute('data-student-id');
-                const studentName = button.getAttribute('data-student-name');
-                
-                document.getElementById('student_id').value = studentId;
-                document.getElementById('student_name').textContent = studentName;
-            });
-        }
-    });
+    //  document.addEventListener('DOMContentLoaded', function () {
+        
+
+    // });
+
 </script>
+
 {% endblock %} 
