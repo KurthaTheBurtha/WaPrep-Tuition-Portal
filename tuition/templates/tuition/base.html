@@ -228,29 +228,34 @@
                     {% if user.is_authenticated %}
                     {% if user.user_type == 'parent' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'tuition:students' %}">
-                            <i class="fas fa-user-graduate me-1"></i> Students
+                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'tuition:parent_dashboard' %}">
+                            <i class="fas fa-user-graduate me-1"></i> My Students
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'payments' %}active{% endif %}" href="{% url 'tuition:payment' %}">
-                            <i class="fas fa-credit-card me-1"></i> Payments
+                            <i class="fas fa-credit-card me-1"></i> Make a Payment
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'history' %}active{% endif %}" href="{% url 'tuition:payment_history' %}">
-                            <i class="fas fa-history me-1"></i> History
+                            <i class="fas fa-history me-1"></i> View Payment History
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'parent_profile' %}active{% endif %}" href="{% url 'tuition:parent_profile' %}">
+                            <i class="fas fa-user me-1"></i> My Profile
                         </a>
                     </li>
                     {% elif user.user_type == 'accountant' %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'tuition:students' %}">
-                            <i class="fas fa-user-graduate me-1"></i> Students
+                            <i class="fas fa-user-graduate me-1"></i> Manage Students
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'accountant_reports' %}active{% endif %}" href="{% url 'tuition:accountant_reports' %}">
-                            <i class="fas fa-chart-bar me-1"></i> Reports
+                            <i class="fas fa-chart-bar me-1"></i> Generate Reports
                         </a>
                     </li>
                     {% endif %}

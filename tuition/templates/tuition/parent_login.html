@@ -45,11 +45,13 @@
                 </div>
 
                 <div class="text-center mt-3">
-                    <p class="mb-0">Are you an accountant? <a href="{% url 'tuition:accountant_login' %}" class="text-decoration-none">Login here</a></p>
-                </div>
-                
+                    <p class="mb-0">Don’t have an account yet? 
+                        <a href="{% url 'tuition:request_account' %}" class="text-decoration-none">Contact Administrator</a>
+                    </p>
+                </div>    
+
                 <div class="text-center mt-3">
-                    <p class="mb-0">Don't have an account? <a href="{% url 'tuition:parent_signup' %}" class="text-decoration-none">Sign up here</a></p>
+                    <p class="mb-0">Are you an accountant? <a href="{% url 'tuition:accountant_login' %}" class="text-decoration-none">Login here</a></p>
                 </div>
                 
                 
@@ -59,6 +61,13 @@
 </div>
 
 <style>
+    .parent-bg {
+        background-image: url("{% static 'tuition/images/waprep kids.jpg' %}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        min-height: 100vh;
+    }
     .login-box {
         background: white;
         padding: 2rem;

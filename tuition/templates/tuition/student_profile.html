@@ -1,0 +1,123 @@
+{% extends 'tuition/base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Back Button -->
+            <a href="{% url 'tuition:students' %}" class="btn btn-link mb-3">
+                <i class="fas fa-arrow-left me-1"></i> Back to Students
+            </a>
+
+            <!-- Student Profile Card -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar-circle bg-primary bg-opacity-10 text-primary me-3"
+                            style="width: 70px; height: 70px; font-size: 1.75rem;">
+                            {{ student.first_name|first }}{{ student.last_name|first }}
+                        </div>
+                        <div>
+                            <h2 class="mb-0">{{ student.first_name }} {{ student.last_name }}</h2>
+                            <small class="text-muted">Student ID: {{ student.student_id }}</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <p><strong>Grade:</strong> Grade {{ student.grade }}</p>
+                            <p><strong>Date of Birth:</strong> {{ student.date_of_birth|date:"M d, Y" }}</p>
+                            <p>
+                                <strong>Status:</strong>
+                                <span
+                                    class="badge {% if student.status == 'active' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 {% if student.status == 'active' %}text-success{% else %}text-danger{% endif %}">
+                                    {{ student.get_status_display }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Notes:</strong></p>
+                            <div class="bg-light p-3 rounded text-muted">
+                                {{ student.notes|default:"No notes added yet." }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Parent Relationships -->
+                    <h5 class="mb-3">Linked Parents</h5>
+                    {% for sp in student.studentparent_set.all %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-circle bg-secondary bg-opacity-10 text-secondary me-3">
+                            {{ sp.parent.first_name|first }}{{ sp.parent.last_name|first }}
+                        </div>
+                        <div>
+                            <strong>{{ sp.parent.first_name }} {{ sp.parent.last_name }}</strong><br>
+                            <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %}
+                                (Primary){% endif %}</small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    {% endfor %}
+                    <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal"
+                        data-bs-target="#addParentModal">
+                        <i class="fas fa-plus me-1"></i> Add Parent
+                    </button>
+                    <!-- <p class="text-muted">No parents linked to this student.</p> -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add Parent Modal -->
+<div class="modal fade" id="addParentModal" tabindex="-1" aria-labelledby="addParentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'tuition:add_parent_to_student' %}">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" value="{{ student.id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addParentModalLabel">Add Parent</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="parent_id" class="form-label">Select Parent</label>
+                        <select class="form-select" name="parent_id" id="parent_id" required>
+                            <option value="">Choose a parent...</option>
+                            {% for parent in parents %}
+                                <option value="{{ parent.id }}">{{ parent.get_full_name }} ({{ parent.email }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="relationship" class="form-label">Relationship</label>
+                        <select class="form-select" name="relationship" required>
+                            <option value="mother">Mother</option>
+                            <option value="father">Father</option>
+                            <option value="guardian">Guardian</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="is_primary" id="is_primary">
+                        <label class="form-check-label" for="is_primary">
+                            Set as primary parent
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Add Parent</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

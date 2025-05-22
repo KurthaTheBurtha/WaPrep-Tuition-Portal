@@ -1,0 +1,32 @@
+{% extends 'tuition/base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="text-center">
+        <h2 class="mb-3">Welcome, {{ user.first_name }}!</h2>
+        <p class="lead mb-4">What would you like to do today?</p>
+
+        <div class="row justify-content-center g-3">
+            <div class="col-md-3">
+                <a href="{% url 'tuition:parent_dashboard' %}" class="btn btn-outline-primary w-100 py-3">
+                    View My Students
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'tuition:payment' %}" class="btn btn-outline-success w-100 py-3">
+                    Make a Tuition Payment
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'tuition:payment_history' %}" class="btn btn-outline-secondary w-100 py-3">
+                    View Payment History
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'tuition:parent_profile' %}" class="btn btn-outline-info w-100 py-3">
+                    View My Profile
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

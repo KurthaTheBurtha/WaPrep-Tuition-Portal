@@ -20,21 +20,6 @@
                 </div>
             </div>
         </div>
-        <div class="col-12 col-md-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-clock text-warning fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Pending Payments</h6>
-                            <h2 class="card-title mb-0">0</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Main Content -->
@@ -68,10 +53,8 @@
                             <thead class="bg-light">
                                 <tr>
                                     <th class="border-0 ps-4">Student Name</th>
-                                    <th class="border-0">Grade</th>
-                                    <th class="border-0">Date of Birth</th>
                                     <th class="border-0">Status</th>
-                                    <th class="border-0">Parent</th>
+                                    <th class="border-0">Parent/Guardian(s)</th>
                                     <th class="border-0">Notes</th>
                                     <th class="border-0">Amount Owed</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
@@ -79,7 +62,7 @@
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                <tr>
+                                <tr class="clickable-row" data-href="{% url 'tuition:student_profile' student.id %}">
                                     <td class="ps-4">
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-circle bg-primary bg-opacity-10 text-primary me-3">
@@ -91,12 +74,6 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
-                                        <span class="badge bg-info bg-opacity-10 text-info">
-                                            Grade {{ student.grade }}
-                                        </span>
-                                    </td>
-                                    <td>{{ student.date_of_birth|date:"M d, Y" }}</td>
                                     <td>
                                         <span class="badge {% if student.status == 'active' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 {% if student.status == 'active' %}text-success{% else %}text-danger{% endif %}">
                                             {{ student.get_status_display }}
@@ -126,14 +103,6 @@
                                                 </button>
                                             </div>
                                             {% endfor %}
-                                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#addParentModal"
-                                                    data-student-id="{{ student.id }}"
-                                                    data-student-name="{{ student.first_name }} {{ student.last_name }}">
-                                                <i class="fas fa-plus text-muted me-1"></i>
-                                                Add Parent
-                                            </button>
                                         </div>
                                     </td>
                                     <td>
@@ -171,14 +140,21 @@
                                                 data-student-grade="{{ student.grade }}"
                                                 data-student-dob="{{ student.date_of_birth|date:'Y-m-d' }}"
                                                 data-student-status="{{ student.status }}">
-                                            <i class="fas fa-edit me-1"></i> Edit
+                                            <i class="fas fa-edit me-1"></i> Student Profile
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger"
-                                            data-bs-toggle="modal" data-bs-target="#deleteStudentModal"
-                                            data-student-id="{{ student.id }}"
-                                            data-student-name="{{ student.first_name }} {{ student.last_name }}">
-                                            <i class="fas fa-trash me-1"></i> Delete
+                                        <button type="button" class="btn btn-sm btn-outline-success me-2"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editStudentModal"
+                                                data-student-id="{{ student.id }}"
+                                                data-student-first-name="{{ student.first_name }}"
+                                                data-student-last-name="{{ student.last_name }}"
+                                                data-student-grade="{{ student.grade }}"
+                                                data-student-dob="{{ student.date_of_birth|date:'Y-m-d' }}"
+                                                data-student-status="{{ student.status }}">
+                                            <i class="fas fa-edit me-1"></i> Payment Information
                                         </button>
+                            
+
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -573,6 +549,15 @@
         if (dobInput && !dobInput.value) {
             dobInput.value = formatted;
         }
+
+        // handle clickable rows
+        document.querySelectorAll('.clickable-row').forEach(row => {
+            row.style.cursor = 'pointer';
+            row.addEventListener('click', () => {
+                window.location = row.getAttribute('data-href');
+            });
+        });
     });
+
 </script>
 {% endblock %}

@@ -118,3 +118,16 @@ class PaymentInstallment(models.Model):
 
     def __str__(self):
         return f"Installment {self.id} for {self.payment_plan}"
+
+class AccountRequest(models.Model):
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    child_first_name = models.CharField(max_length=100)
+    child_last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    contact_info = models.TextField(blank=True)
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - Account Request"

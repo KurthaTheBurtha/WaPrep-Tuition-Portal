@@ -10,6 +10,9 @@ import random
 import string
 from django.core.mail import send_mail
 from django.db import models
+from .forms import AccountRequestForm
+from django.conf import settings
+from .forms import ParentProfileForm
 
 # Create your views here.
 
@@ -30,7 +33,7 @@ def parent_login(request):
                 if not remember:
                     request.session.set_expiry(0)  # Session expires when browser closes
                 
-                return redirect('tuition:parent_dashboard')  # Redirect to parent dashboard
+                return redirect('tuition:parent_welcome')  # Redirect to parent dashboard
             else:
                 messages.error(request, 'Invalid email or password for parent account.')
         except User.DoesNotExist:
@@ -528,3 +531,78 @@ def add_student_to_parent(request):
             messages.error(request, f'Error adding student: {str(e)}')
     
     return redirect('tuition:parent_dashboard')
+
+@login_required
+def student_profile(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    return render(request, 'tuition/student_profile.html', {
+        'student': student,
+    })
+
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+def student_profile(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    parents = User.objects.filter(user_type='parent')  # filter to only parent users
+
+    return render(request, 'tuition/student_profile.html', {
+        'student': student,
+        'parents': parents,
+    })
+
+def request_account_view(request):
+    if request.method == 'POST':
+        form = AccountRequestForm(request.POST)
+        if form.is_valid():
+            request_obj = form.save()
+
+            # Email content
+            subject = 'New Parent Account Request'
+            message = f"""
+A new parent has submitted an account request:
+
+Name: {request_obj.first_name} {request_obj.last_name}
+Child: {request_obj.child_first_name} {request_obj.child_last_name}
+Email: {request_obj.email}
+Other Contact Info: {request_obj.contact_info}
+
+Please review and follow up accordingly.
+            """.strip()
+
+            send_mail(
+                subject,
+                message,  
+                None,  # Uses DEFAULT_FROM_EMAIL
+                [admin[1] for admin in settings.ADMINS],
+                fail_silently=False,
+            )
+
+            messages.success(request, 'Your request has been submitted. We will contact you soon.')
+            return redirect('tuition:parent_login')
+    else:
+        form = AccountRequestForm()
+    
+    return render(request, 'tuition/request_account.html', {'form': form})
+
+@login_required
+def parent_welcome(request):
+    if request.user.user_type != 'parent':
+        return redirect('tuition:accountant_login')  # or show 403
+    return render(request, 'tuition/parent_welcome.html')
+
+@login_required
+def parent_profile_view(request):
+    if request.user.user_type != 'parent':
+        return redirect('tuition:parent_dashboard')  # or return 403
+
+    if request.method == 'POST':
+        form = ParentProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('tuition:parent_profile')
+    else:
+        form = ParentProfileForm(instance=request.user)
+
+    return render(request, 'tuition/parent_profile.html', {'form': form})
