@@ -2,19 +2,21 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from decimal import Decimal
 
 class User(AbstractUser):
     USER_TYPE_CHOICES = (
-        ('parent', 'Parent'),
-        ('accountant', 'Accountant'),
+        ('payer', 'Payer'),
+        ('admin', 'Admin'),
     )
     
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
+    contact_info = models.TextField(blank=True)
     
-    def is_accountant(self):
-        return self.user_type == 'accountant'
+    def is_admin(self):
+        return self.user_type == 'admin'
 
 class Student(models.Model):
     STATUS_CHOICES = (
@@ -28,15 +30,16 @@ class Student(models.Model):
     date_of_birth = models.DateField()
     grade = models.CharField(max_length=20)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    notes = models.TextField(blank=True, help_text="Accountant's notes about the student")
-    parents = models.ManyToManyField(User, through='StudentParent', related_name='students')
+    notes = models.TextField(blank=True, help_text="admin's notes about the student")
+    payers = models.ManyToManyField(User, through='StudentPayer', related_name='students')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    current_balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
-class StudentParent(models.Model):
+class Studentpayer(models.Model):
     RELATIONSHIP_CHOICES = (
         ('mother', 'Mother'),
         ('father', 'Father'),
@@ -45,18 +48,18 @@ class StudentParent(models.Model):
     )
     
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    parent = models.ForeignKey(User, on_delete=models.CASCADE)
+    payer = models.ForeignKey(User, on_delete=models.CASCADE)
     relationship = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('student', 'parent')
+        unique_together = ('student', 'payer')
         ordering = ['-is_primary', 'relationship']
 
     def __str__(self):
-        return f"{self.parent.get_full_name()} - {self.get_relationship_display()} of {self.student}"
+        return f"{self.payer.get_full_name()} - {self.get_relationship_display()} of {self.student}"
 
 class Payment(models.Model):
     STATUS_CHOICES = (

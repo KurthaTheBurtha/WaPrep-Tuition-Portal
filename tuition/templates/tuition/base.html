@@ -5,7 +5,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WaPrep Portal</title>
+    <title>Waprep Tuition Portal</title>
+    <link rel="icon" type="image/png" href="{% static 'tuition/images/wapreplogochatgpt.png' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{% static 'tuition/css/style.css' %}" rel="stylesheet">
@@ -72,7 +73,7 @@
             letter-spacing: 0.5px;
             border-radius: 0;
             padding: 0.4rem 0.2rem;
-            border-bottom: 2px solid transparent;
+            border-bottom: 2px solid transpayer;
             transition: border-color 0.2s, color 0.2s;
         }
 
@@ -209,6 +210,16 @@
                 padding: 0.4rem 0.7rem;
             }
         }
+
+        .navbar-toggler:hover i,
+        .navbar-toggler:focus i {
+            color: var(--secondary-color);
+        }
+
+        .nav-link.active {
+            border-bottom: 2px solid #e6392d;
+            color: #e6392d !important;
+        }
     </style>
 </head>
 
@@ -216,57 +227,63 @@
     {% if show_navbar|default:True %}
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid px-4">
-            <a class="navbar-brand" href="{% url 'tuition:home' %}">
+            <a class="navbar-brand" href="{% url 'home' %}">
                 <img src="{% static 'tuition/images/wapreplogo.png' %}" alt="WaPrep Logo">
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+                <i class="fas fa-bars text-dark fs-3"></i>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% if not hide_nav_items %}
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
-                    {% if user.user_type == 'parent' %}
+                    {% if user.user_type == 'payer' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'tuition:parent_dashboard' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'payer_dashboard' %}active{% endif %}"
+                            href="{% url 'payer_dashboard' %}">
                             <i class="fas fa-user-graduate me-1"></i> My Students
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'payments' %}active{% endif %}" href="{% url 'tuition:payment' %}">
+                    <!-- <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'payment' %}active{% endif %}"
+                            href="{% url 'payment' %}">
                             <i class="fas fa-credit-card me-1"></i> Make a Payment
                         </a>
-                    </li>
+                    </li> -->
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'history' %}active{% endif %}" href="{% url 'tuition:payment_history' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'payment_history' %}active{% endif %}"
+                            href="{% url 'payment_history' %}">
                             <i class="fas fa-history me-1"></i> View Payment History
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'parent_profile' %}active{% endif %}" href="{% url 'tuition:parent_profile' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'payer_profile' %}active{% endif %}"
+                            href="{% url 'payer_profile' %}">
                             <i class="fas fa-user me-1"></i> My Profile
                         </a>
                     </li>
                     {% elif user.user_type == 'accountant' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'tuition:students' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}"
+                            href="{% url 'students' %}">
                             <i class="fas fa-user-graduate me-1"></i> Manage Students
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'accountant_reports' %}active{% endif %}" href="{% url 'tuition:accountant_reports' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'accountant_reports' %}active{% endif %}"
+                            href="{% url 'accountant_reports' %}">
                             <i class="fas fa-chart-bar me-1"></i> Generate Reports
                         </a>
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tuition:logout' %}">
+                        <a class="nav-link" href="{% url 'logout' %}">
                             <i class="fas fa-sign-out-alt me-1"></i> Logout
                         </a>
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tuition:home' %}">
+                        <a class="nav-link" href="{% url 'home' %}">
                             <i class="fas fa-sign-in-alt me-1"></i> Login
                         </a>
                     </li>

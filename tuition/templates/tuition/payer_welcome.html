@@ -1,0 +1,14 @@
+{% extends 'tuition/base.html' %}
+{% block content %}
+<style>
+    .welcome-text {
+        font-size: 8rem; /* Adjust size as needed */
+        font-weight: 600;
+        margin-top: 2rem;
+    }
+</style>
+
+<div class="text-center">
+    <h2 class="welcome-text">Welcome, {{ user.first_name }}!</h2>
+</div>
+{% endblock %}

@@ -54,7 +54,7 @@
                                 <tr>
                                     <th class="border-0 ps-4">Student Name</th>
                                     <th class="border-0">Status</th>
-                                    <th class="border-0">Parent/Guardian(s)</th>
+                                    <th class="border-0">payer/Guardian(s)</th>
                                     <th class="border-0">Notes</th>
                                     <th class="border-0">Amount Owed</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
@@ -62,7 +62,7 @@
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                <tr class="clickable-row" data-href="{% url 'tuition:student_profile' student.id %}">
+                                <tr class="clickable-row" data-href="{% url 'student_profile' student.id %}">
                                     <td class="ps-4">
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-circle bg-primary bg-opacity-10 text-primary me-3">
@@ -81,24 +81,24 @@
                                     </td>
                                     <td>
                                         <div class="d-flex flex-column">
-                                            {% for student_parent in student.studentparent_set.all %}
+                                            {% for student_payer in student.studentpayer_set.all %}
                                             <div class="d-flex align-items-center mb-2">
                                                 <div class="avatar-circle bg-secondary bg-opacity-10 text-secondary me-2">
-                                                    {{ student_parent.parent.first_name|first }}{{ student_parent.parent.last_name|first }}
+                                                    {{ student_payer.payer.first_name|first }}{{ student_payer.payer.last_name|first }}
                                                 </div>
                                                 <div class="flex-grow-1">
-                                                    <h6 class="mb-0">{{ student_parent.parent.first_name }} {{ student_parent.parent.last_name }}</h6>
+                                                    <h6 class="mb-0">{{ student_payer.payer.first_name }} {{ student_payer.payer.last_name }}</h6>
                                                     <small class="text-muted">
-                                                        {{ student_parent.get_relationship_display }}
-                                                        {% if student_parent.is_primary %}<span class="badge bg-primary bg-opacity-10 text-primary ms-1">Primary</span>{% endif %}
+                                                        {{ student_payer.get_relationship_display }}
+                                                        {% if student_payer.is_primary %}<span class="badge bg-primary bg-opacity-10 text-primary ms-1">Primary</span>{% endif %}
                                                     </small>
                                                 </div>
                                                 <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-2"
                                                         data-bs-toggle="modal" 
-                                                        data-bs-target="#removeParentModal"
+                                                        data-bs-target="#removepayerModal"
                                                         data-student-id="{{ student.id }}"
-                                                        data-parent-id="{{ student_parent.parent.id }}"
-                                                        data-parent-name="{{ student_parent.parent.first_name }} {{ student_parent.parent.last_name }}">
+                                                        data-payer-id="{{ student_payer.payer.id }}"
+                                                        data-payer-name="{{ student_payer.payer.first_name }} {{ student_payer.payer.last_name }}">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             </div>
@@ -185,7 +185,7 @@
 <div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:add_student' %}">
+            <form method="post" action="{% url 'add_student' %}">
                 {% csrf_token %}
                 <div class="modal-header">
                     <h5 class="modal-title" id="addStudentModalLabel">Add New Student</h5>
@@ -232,7 +232,7 @@
 <div class="modal fade" id="deleteStudentModal" tabindex="-1" aria-labelledby="deleteStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:delete_student' %}">
+            <form method="post" action="{% url 'delete_student' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" id="delete_student_id">
                 <div class="modal-header border-0">
@@ -263,7 +263,7 @@
 <div class="modal fade" id="editNotesModal" tabindex="-1" aria-labelledby="editNotesModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:update_student_notes' %}">
+            <form method="post" action="{% url 'update_student_notes' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" id="edit_notes_student_id">
                 <div class="modal-header">
@@ -290,7 +290,7 @@
 <div class="modal fade" id="editStudentModal" tabindex="-1" aria-labelledby="editStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:update_student' %}">
+            <form method="post" action="{% url 'update_student' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" id="edit_student_id">
                 <div class="modal-header">
@@ -339,25 +339,25 @@
     </div>
 </div>
 
-<!-- Add Parent Modal -->
-<div class="modal fade" id="addParentModal" tabindex="-1" aria-labelledby="addParentModalLabel" aria-hidden="true">
+<!-- Add payer Modal -->
+<div class="modal fade" id="addpayerModal" tabindex="-1" aria-labelledby="addpayerModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:add_parent_to_student' %}">
+            <form method="post" action="{% url 'add_payer_to_student' %}">
                 {% csrf_token %}
-                <input type="hidden" name="student_id" id="add_parent_student_id">
+                <input type="hidden" name="student_id" id="add_payer_student_id">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addParentModalLabel">Add Parent</h5>
+                    <h5 class="modal-title" id="addpayerModalLabel">Add payer</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted mb-3" id="add_parent_student_name"></p>
+                    <p class="text-muted mb-3" id="add_payer_student_name"></p>
                     <div class="mb-3">
-                        <label for="parent_id" class="form-label">Parent</label>
-                        <select class="form-select" id="parent_id" name="parent_id" required>
-                            <option value="">Select Parent</option>
-                            {% for parent in parents %}
-                            <option value="{{ parent.id }}">{{ parent.get_full_name }} ({{ parent.email }})</option>
+                        <label for="payer_id" class="form-label">payer</label>
+                        <select class="form-select" id="payer_id" name="payer_id" required>
+                            <option value="">Select payer</option>
+                            {% for payer in payers %}
+                            <option value="{{ payer.id }}">{{ payer.get_full_name }} ({{ payer.email }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -374,45 +374,45 @@
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="is_primary" name="is_primary">
                             <label class="form-check-label" for="is_primary">
-                                Set as Primary Parent
+                                Set as Primary payer
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Parent</button>
+                    <button type="submit" class="btn btn-primary">Add payer</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Remove Parent Modal -->
-<div class="modal fade" id="removeParentModal" tabindex="-1" aria-labelledby="removeParentModalLabel" aria-hidden="true">
+<!-- Remove payer Modal -->
+<div class="modal fade" id="removepayerModal" tabindex="-1" aria-labelledby="removepayerModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:remove_parent_from_student' %}">
+            <form method="post" action="{% url 'remove_payer_from_student' %}">
                 {% csrf_token %}
-                <input type="hidden" name="student_id" id="remove_parent_student_id">
-                <input type="hidden" name="parent_id" id="remove_parent_id">
+                <input type="hidden" name="student_id" id="remove_payer_student_id">
+                <input type="hidden" name="payer_id" id="remove_payer_id">
                 <div class="modal-header border-0">
-                    <h5 class="modal-title visually-hidden" id="removeParentModalLabel">Remove Parent</h5>
+                    <h5 class="modal-title visually-hidden" id="removepayerModalLabel">Remove payer</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center pb-5">
                     <div class="mb-4">
                         <i class="fas fa-exclamation-circle text-danger fa-3x"></i>
                     </div>
-                    <h4 class="mb-3">Remove Parent</h4>
+                    <h4 class="mb-3">Remove payer</h4>
                     <p class="mb-1">Are you sure you want to remove</p>
-                    <p class="h5 mb-3" id="remove_parent_name"></p>
+                    <p class="h5 mb-3" id="remove_payer_name"></p>
                     <p class="text-danger mb-0">This action cannot be undone.</p>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-user-minus me-1"></i> Remove Parent
+                        <i class="fas fa-user-minus me-1"></i> Remove payer
                     </button>
                 </div>
             </form>
@@ -454,7 +454,7 @@
 
     .card-header {
         border-bottom: 1px solid rgba(0, 0, 0, .05);
-        background-color: transparent;
+        background-color: transpayer;
     }
 
     .badge {
@@ -519,24 +519,24 @@
             });
         }
 
-        // Add parent modal handler
-        const addParentModal = document.getElementById('addParentModal');
-        if (addParentModal) {
-            addParentModal.addEventListener('show.bs.modal', function (event) {
+        // Add payer modal handler
+        const addpayerModal = document.getElementById('addpayerModal');
+        if (addpayerModal) {
+            addpayerModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
-                document.getElementById('add_parent_student_id').value = button.getAttribute('data-student-id');
-                document.getElementById('add_parent_student_name').textContent = button.getAttribute('data-student-name');
+                document.getElementById('add_payer_student_id').value = button.getAttribute('data-student-id');
+                document.getElementById('add_payer_student_name').textContent = button.getAttribute('data-student-name');
             });
         }
 
-        // Remove parent modal handler
-        const removeParentModal = document.getElementById('removeParentModal');
-        if (removeParentModal) {
-            removeParentModal.addEventListener('show.bs.modal', function (event) {
+        // Remove payer modal handler
+        const removepayerModal = document.getElementById('removepayerModal');
+        if (removepayerModal) {
+            removepayerModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
-                document.getElementById('remove_parent_student_id').value = button.getAttribute('data-student-id');
-                document.getElementById('remove_parent_id').value = button.getAttribute('data-parent-id');
-                document.getElementById('remove_parent_name').textContent = button.getAttribute('data-parent-name');
+                document.getElementById('remove_payer_student_id').value = button.getAttribute('data-student-id');
+                document.getElementById('remove_payer_id').value = button.getAttribute('data-payer-id');
+                document.getElementById('remove_payer_name').textContent = button.getAttribute('data-payer-name');
             });
         }
 

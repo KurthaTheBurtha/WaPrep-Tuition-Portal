@@ -5,7 +5,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10">
             <!-- Back Button -->
-            <a href="{% url 'tuition:students' %}" class="btn btn-link mb-3">
+            <a href="{% url 'students' %}" class="btn btn-link mb-3">
                 <i class="fas fa-arrow-left me-1"></i> Back to Students
             </a>
 
@@ -45,15 +45,15 @@
 
                     <hr class="my-4">
 
-                    <!-- Parent Relationships -->
-                    <h5 class="mb-3">Linked Parents</h5>
-                    {% for sp in student.studentparent_set.all %}
+                    <!-- payer Relationships -->
+                    <h5 class="mb-3">Linked payers</h5>
+                    {% for sp in student.studentpayer_set.all %}
                     <div class="d-flex align-items-center mb-3">
                         <div class="avatar-circle bg-secondary bg-opacity-10 text-secondary me-3">
-                            {{ sp.parent.first_name|first }}{{ sp.parent.last_name|first }}
+                            {{ sp.payer.first_name|first }}{{ sp.payer.last_name|first }}
                         </div>
                         <div>
-                            <strong>{{ sp.parent.first_name }} {{ sp.parent.last_name }}</strong><br>
+                            <strong>{{ sp.payer.first_name }} {{ sp.payer.last_name }}</strong><br>
                             <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %}
                                 (Primary){% endif %}</small>
                         </div>
@@ -61,10 +61,10 @@
                     {% empty %}
                     {% endfor %}
                     <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal"
-                        data-bs-target="#addParentModal">
-                        <i class="fas fa-plus me-1"></i> Add Parent
+                        data-bs-target="#addpayerModal">
+                        <i class="fas fa-plus me-1"></i> Add payer
                     </button>
-                    <!-- <p class="text-muted">No parents linked to this student.</p> -->
+                    <!-- <p class="text-muted">No payers linked to this student.</p> -->
                 </div>
             </div>
         </div>
@@ -73,24 +73,24 @@
 {% endblock %}
 
 {% block modals %}
-<!-- Add Parent Modal -->
-<div class="modal fade" id="addParentModal" tabindex="-1" aria-labelledby="addParentModalLabel" aria-hidden="true">
+<!-- Add payer Modal -->
+<div class="modal fade" id="addpayerModal" tabindex="-1" aria-labelledby="addpayerModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'tuition:add_parent_to_student' %}">
+            <form method="post" action="{% url 'add_payer_to_student' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" value="{{ student.id }}">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addParentModalLabel">Add Parent</h5>
+                    <h5 class="modal-title" id="addpayerModalLabel">Add payer</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="parent_id" class="form-label">Select Parent</label>
-                        <select class="form-select" name="parent_id" id="parent_id" required>
-                            <option value="">Choose a parent...</option>
-                            {% for parent in parents %}
-                                <option value="{{ parent.id }}">{{ parent.get_full_name }} ({{ parent.email }})</option>
+                        <label for="payer_id" class="form-label">Select payer</label>
+                        <select class="form-select" name="payer_id" id="payer_id" required>
+                            <option value="">Choose a payer...</option>
+                            {% for payer in payers %}
+                                <option value="{{ payer.id }}">{{ payer.get_full_name }} ({{ payer.email }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -108,12 +108,12 @@
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" name="is_primary" id="is_primary">
                         <label class="form-check-label" for="is_primary">
-                            Set as primary parent
+                            Set as primary payer
                         </label>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Add Parent</button>
+                    <button type="submit" class="btn btn-primary">Add payer</button>
                 </div>
             </form>
         </div>

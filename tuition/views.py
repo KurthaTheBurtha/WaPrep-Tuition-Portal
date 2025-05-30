@@ -5,21 +5,25 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, StudentParent
+from .models import User, Student, Payment, Studentpayer
 import random
 import string
 from django.core.mail import send_mail
 from django.db import models
 from .forms import AccountRequestForm
 from django.conf import settings
-from .forms import ParentProfileForm
+from .forms import PayerProfileForm
+from .forms import EditPayerProfileForm
+from django.db.models import Sum
+
+
 
 # Create your views here.
 
 def home(request):
     return render(request, 'tuition/select_login.html', {'show_navbar': False})
 
-def parent_login(request):
+def payer_login(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
@@ -27,21 +31,21 @@ def parent_login(request):
         
         try:
             user = User.objects.get(email=email)
-            if user.check_password(password) and user.user_type == 'parent':
+            if user.check_password(password) and user.user_type == 'payer':
                 login(request, user)
                 
                 if not remember:
                     request.session.set_expiry(0)  # Session expires when browser closes
                 
-                return redirect('tuition:parent_welcome')  # Redirect to parent dashboard
+                return redirect('payer_welcome')  # Redirect to payer dashboard
             else:
-                messages.error(request, 'Invalid email or password for parent account.')
+                messages.error(request, 'Invalid email or password for payer account.')
         except User.DoesNotExist:
-            messages.error(request, 'Invalid email or password for parent account.')
+            messages.error(request, 'Invalid email or password for payer account.')
     
-    return render(request, 'tuition/parent_login.html', {'hide_nav_items': True})
+    return render(request, 'tuition/payer_login.html', {'hide_nav_items': True})
 
-def parent_signup(request):
+def payer_signup(request):
     if request.method == 'POST':
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
@@ -53,15 +57,15 @@ def parent_signup(request):
             messages.error(request, "An account with this email already exists.")
         else:
             user = User.objects.create_user(username=email, first_name=first_name, last_name=last_name, email=email, password=password)
-            user.user_type = 'parent'
+            user.user_type = 'payer'
             user.save()
             login(request, user)
             messages.success(request, "Account created successfully.")
-            return redirect('tuition:parent_dashboard')
+            return redirect('payer_dashboard')
 
-    return render(request, 'tuition/parent_signup.html')
+    return render(request, 'tuition/payer_signup.html')
 
-def accountant_login(request):
+def admin_login(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
@@ -69,31 +73,31 @@ def accountant_login(request):
         
         try:
             user = User.objects.get(email=email)
-            if user.check_password(password) and user.user_type == 'accountant':
+            if user.check_password(password) and user.user_type == 'admin':
                 login(request, user)
                 
                 if not remember:
                     request.session.set_expiry(0)  # Session expires when browser closes
                 
-                return redirect('tuition:students')  # Redirect to students page
+                return redirect('students')  # Redirect to students page
             else:
-                messages.error(request, 'Invalid email or password for accountant account.')
+                messages.error(request, 'Invalid email or password for admin account.')
         except User.DoesNotExist:
-            messages.error(request, 'Invalid email or password for accountant account.')
+            messages.error(request, 'Invalid email or password for admin account.')
     
-    return render(request, 'tuition/accountant_login.html', {'hide_nav_items': True})
+    return render(request, 'tuition/admin_login.html', {'hide_nav_items': True})
 
 def logout_view(request):
     logout(request)
     messages.success(request, 'You have been successfully logged out.')
-    return redirect('tuition:home')
+    return redirect('home')
 
 @login_required
 def payment(request):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
         
     # In a real application, these would come from a database
     context = {
@@ -104,10 +108,10 @@ def payment(request):
 
 @login_required
 def process_payment(request):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
         
     if request.method == 'POST':
         # In a real application, you would:
@@ -116,15 +120,15 @@ def process_payment(request):
         # 3. Store the payment record in the database
         # 4. Send a confirmation email
         messages.success(request, 'Payment processed successfully!')
-        return redirect('tuition:payment_history')
-    return redirect('tuition:payment')
+        return redirect('payment_history')
+    return redirect('payment')
 
 @login_required
 def payment_history(request):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
         
     # In a real application, this would come from a database
     payments = [
@@ -145,10 +149,10 @@ def payment_history(request):
 
 @login_required
 def download_receipt(request, payment_id):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
         
     # In a real application, you would:
     # 1. Fetch the payment details from the database
@@ -157,11 +161,11 @@ def download_receipt(request, payment_id):
     return HttpResponse("Receipt download functionality will be implemented here")
 
 @login_required
-def accountant_dashboard(request):
-    # Only accessible by accountants
-    if request.user.user_type != 'accountant':
+def admin_dashboard(request):
+    # Only accessible by admins
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:parent_login')
+        return redirect('payer_login')
     
     # In a real application, these would come from a database
     context = {
@@ -183,23 +187,23 @@ def accountant_dashboard(request):
             }
         ]
     }
-    return render(request, 'tuition/accountant_dashboard.html', context)
+    return render(request, 'tuition/admin_dashboard.html', context)
 
 def forgot_password(request):
     return render(request, 'tuition/forgot_password.html')
 
 @login_required
 def students(request):
-    if request.user.user_type != 'accountant':
-        messages.error(request, 'Only accountants can access this page.')
-        return redirect('tuition:accountant_login')
+    if request.user.user_type != 'admin':
+        messages.error(request, 'Only admins can access this page.')
+        return redirect('admin_login')
     
     students = Student.objects.all()
-    parents = User.objects.filter(user_type='parent')
+    payers = User.objects.filter(user_type='payer')
     
     context = {
         'students': students,
-        'parents': parents,
+        'payers': payers,
     }
     return render(request, 'tuition/students.html', context)
 
@@ -241,7 +245,7 @@ def add_student(request):
         last_name = request.POST.get('last_name')
         grade = request.POST.get('grade')
         birthday = request.POST.get('date_of_birth')
-        parent_id = request.POST.get('parent_id')
+        payer_id = request.POST.get('payer_id')
         relationship = request.POST.get('relationship', 'other')
         is_primary = request.POST.get('is_primary', False) == 'on'
 
@@ -251,7 +255,7 @@ def add_student(request):
             student_id = generate_student_id(first_name, last_name, birthday_date)
         except:
             messages.error(request, 'Invalid birthday format')
-            return redirect('tuition:students')
+            return redirect('students')
 
         try:
             # Create student
@@ -263,12 +267,12 @@ def add_student(request):
                 grade=grade,
             )
 
-            # Add parent relationship
-            if parent_id:
-                parent = User.objects.get(id=parent_id)
-                StudentParent.objects.create(
+            # Add payer relationship
+            if payer_id:
+                payer = User.objects.get(id=payer_id)
+                Studentpayer.objects.create(
                     student=student,
-                    parent=parent,
+                    payer=payer,
                     relationship=relationship,
                     is_primary=is_primary
                 )
@@ -276,17 +280,17 @@ def add_student(request):
             messages.success(request, 'Student added successfully')
         except Exception as e:
             messages.error(request, f'Error adding student: {str(e)}')
-            return redirect('tuition:students')
+            return redirect('students')
             
-        return redirect('tuition:students')
-    return redirect('tuition:students')
+        return redirect('students')
+    return redirect('students')
 
 @login_required
 def delete_student(request):
-    # Only allow parent users
-    if request.user.user_type != 'accountant':
+    # Only allow payer users
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:home')
+        return redirect('home')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -298,17 +302,17 @@ def delete_student(request):
         except Exception as e:
             messages.error(request, f'Error deleting student: {str(e)}')
     
-    return redirect('tuition:students')
+    return redirect('students')
 
 def select_login(request):
     return render(request, 'tuition/select_login.html', {'show_navbar': False})
 
 @login_required
 def update_student_notes(request):
-    # Only allow accountant users
-    if request.user.user_type != 'accountant':
+    # Only allow admin users
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:parent_login')
+        return redirect('payer_login')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -322,14 +326,14 @@ def update_student_notes(request):
         except Exception as e:
             messages.error(request, f'Error updating notes: {str(e)}')
     
-    return redirect('tuition:students')
+    return redirect('students')
 
 @login_required
 def update_student(request):
-    # Only allow accountant users
-    if request.user.user_type != 'accountant':
+    # Only allow admin users
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -351,74 +355,74 @@ def update_student(request):
         except Exception as e:
             messages.error(request, f'Error updating student: {str(e)}')
     
-    return redirect('tuition:students')
+    return redirect('students')
 
 @login_required
-def add_parent_to_student(request):
-    # Only allow accountant users
-    if request.user.user_type != 'accountant':
+def add_payer_to_student(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
-        parent_id = request.POST.get('parent_id')
+        payer_id = request.POST.get('payer_id')
         relationship = request.POST.get('relationship')
         is_primary = request.POST.get('is_primary', False) == 'on'
         
         try:
             student = get_object_or_404(Student, id=student_id)
-            parent = get_object_or_404(User, id=parent_id)
+            payer = get_object_or_404(User, id=payer_id)
             
-            # If this is set as primary, unset any existing primary parent
+            # If this is set as primary, unset any existing primary payer
             if is_primary:
-                StudentParent.objects.filter(student=student, is_primary=True).update(is_primary=False)
+                Studentpayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
             
-            StudentParent.objects.create(
+            Studentpayer.objects.create(
                 student=student,
-                parent=parent,
+                payer=payer,
                 relationship=relationship,
                 is_primary=is_primary
             )
-            messages.success(request, f'Added {parent.get_full_name()} as {relationship} for {student}')
+            messages.success(request, f'Added {payer.get_full_name()} as {relationship} for {student}')
         except Exception as e:
-            messages.error(request, f'Error adding parent: {str(e)}')
+            messages.error(request, f'Error adding payer: {str(e)}')
     
-    return redirect('tuition:students')
+    return redirect('students')
 
 @login_required
-def remove_parent_from_student(request):
-    # Only allow accountant users
-    if request.user.user_type != 'accountant':
+def remove_payer_from_student(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:accountant_login')
+        return redirect('admin_login')
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
-        parent_id = request.POST.get('parent_id')
+        payer_id = request.POST.get('payer_id')
         
         try:
             student = get_object_or_404(Student, id=student_id)
-            parent = get_object_or_404(User, id=parent_id)
+            payer = get_object_or_404(User, id=payer_id)
             
-            # Don't allow removing the last parent
-            if student.parents.count() <= 1:
-                messages.error(request, 'Cannot remove the last parent from a student')
-                return redirect('tuition:students')
+            # Don't allow removing the last payer
+            if student.payers.count() <= 1:
+                messages.error(request, 'Cannot remove the last payer from a student')
+                return redirect('students')
             
-            StudentParent.objects.filter(student=student, parent=parent).delete()
-            messages.success(request, f'Removed {parent.get_full_name()} from {student}')
+            Studentpayer.objects.filter(student=student, payer=payer).delete()
+            messages.success(request, f'Removed {payer.get_full_name()} from {student}')
         except Exception as e:
-            messages.error(request, f'Error removing parent: {str(e)}')
+            messages.error(request, f'Error removing payer: {str(e)}')
     
-    return redirect('tuition:students')
+    return redirect('students')
 
 @login_required
-def accountant_reports(request):
-    # Only allow accountant users
-    if request.user.user_type != 'accountant':
-        messages.error(request, 'Only accountants can access this page.')
-        return redirect('tuition:accountant_login')
+def admin_reports(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'Only admins can access this page.')
+        return redirect('admin_login')
     
     # Get the selected year from query parameters, default to current year
     selected_year = request.GET.get('year', timezone.now().year)
@@ -457,52 +461,38 @@ def accountant_reports(request):
         'monthly_totals': monthly_totals,
         'payments': payments,
     }
-    return render(request, 'tuition/accountant_reports.html', context)
+    return render(request, 'tuition/admin_reports.html', context)
 
 @login_required
-def parent_dashboard(request):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+def payer_dashboard(request):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:parent_login')
+        return redirect('payer_login')
     
-    # Get search query
-    search_query = request.GET.get('search', '')
-    
-    # Get all students that are not already associated with this parent
-    available_students = Student.objects.exclude(
-        studentparent__parent=request.user
-    ).order_by('first_name', 'last_name')
-    
-    # If there's a search query, filter the students
-    if search_query:
-        available_students = available_students.filter(
-            models.Q(first_name__icontains=search_query) |
-            models.Q(last_name__icontains=search_query) |
-            models.Q(student_id__icontains=search_query)
-        )
-    
-    # Get students already associated with this parent
-    my_students = Student.objects.filter(studentparent__parent=request.user).distinct()
+    # Get students already associated with this payer
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
 
+    # Calculate total amount owed
+    total_amount_owed = my_students.aggregate(total=Sum('current_balance'))['total'] or 0
     
     context = {
-        'available_students': available_students,
         'my_students': my_students,
-        'search_query': search_query,
+        'total_amount_owed': total_amount_owed,
+
     }
-    return render(request, 'tuition/parent_dashboard.html', context)
+    return render(request, 'tuition/payer_dashboard.html', context)
 
 @login_required
-def add_student_to_parent(request):
-    # Only allow parent users
-    if request.user.user_type != 'parent':
+def add_student_to_payer(request):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('tuition:parent_login')
+        return redirect('payer_login')
     
 
     if request.method == 'POST':
-        print("POST to add_student_to_parent received:", request.POST)
+        print("POST to add_student_to_payer received:", request.POST)
         student_id = request.POST.get('student_id')
         relationship = request.POST.get('relationship', 'other')
         is_primary = request.POST.get('is_primary', False) == 'on'
@@ -510,19 +500,19 @@ def add_student_to_parent(request):
         try:
             student = get_object_or_404(Student, id=student_id)
             
-            # Check if the student is already linked to this parent
-            if StudentParent.objects.filter(student=student, parent=request.user).exists():
+            # Check if the student is already linked to this payer
+            if Studentpayer.objects.filter(student=student, payer=request.user).exists():
                 messages.warning(request, f'{student.first_name} {student.last_name} is already linked to your account.')
-                return redirect('tuition:parent_dashboard')
+                return redirect('payer_dashboard')
 
-            # If this is set as primary, unset any existing primary parent
+            # If this is set as primary, unset any existing primary payer
             if is_primary:
-                StudentParent.objects.filter(student=student, is_primary=True).update(is_primary=False)
+                Studentpayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
             
-            # Create the parent-student relationship
-            StudentParent.objects.create(
+            # Create the payer-student relationship
+            Studentpayer.objects.create(
                 student=student,
-                parent=request.user,
+                payer=request.user,
                 relationship=relationship,
                 is_primary=is_primary
             )
@@ -530,26 +520,15 @@ def add_student_to_parent(request):
         except Exception as e:
             messages.error(request, f'Error adding student: {str(e)}')
     
-    return redirect('tuition:parent_dashboard')
-
-@login_required
-def student_profile(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
-    return render(request, 'tuition/student_profile.html', {
-        'student': student,
-    })
-
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
+    return redirect('payer_dashboard')
 
 def student_profile(request, student_id):
     student = get_object_or_404(Student, id=student_id)
-    parents = User.objects.filter(user_type='parent')  # filter to only parent users
+    payers = User.objects.filter(user_type='payer')  # filter to only payer users
 
     return render(request, 'tuition/student_profile.html', {
         'student': student,
-        'parents': parents,
+        'payers': payers,
     })
 
 def request_account_view(request):
@@ -559,12 +538,11 @@ def request_account_view(request):
             request_obj = form.save()
 
             # Email content
-            subject = 'New Parent Account Request'
+            subject = 'New payer Account Request'
             message = f"""
-A new parent has submitted an account request:
+A new payer has submitted an account request:
 
 Name: {request_obj.first_name} {request_obj.last_name}
-Child: {request_obj.child_first_name} {request_obj.child_last_name}
 Email: {request_obj.email}
 Other Contact Info: {request_obj.contact_info}
 
@@ -574,35 +552,47 @@ Please review and follow up accordingly.
             send_mail(
                 subject,
                 message,  
-                None,  # Uses DEFAULT_FROM_EMAIL
-                [admin[1] for admin in settings.ADMINS],
+                "burthathekurtha@gmail.com",  # Uses DEFAULT_FROM_EMAIL
+                ['burthathekurtha@gmail.com'],
                 fail_silently=False,
             )
 
             messages.success(request, 'Your request has been submitted. We will contact you soon.')
-            return redirect('tuition:parent_login')
+            return redirect('payer_login')
     else:
         form = AccountRequestForm()
     
     return render(request, 'tuition/request_account.html', {'form': form})
 
 @login_required
-def parent_welcome(request):
-    if request.user.user_type != 'parent':
-        return redirect('tuition:accountant_login')  # or show 403
-    return render(request, 'tuition/parent_welcome.html')
+def payer_welcome(request):
+    if request.user.user_type != 'payer':
+        return redirect('admin_login')  # or show 403
+    return render(request, 'tuition/payer_welcome.html')
 
 @login_required
-def parent_profile_view(request):
-    if request.user.user_type != 'parent':
-        return redirect('tuition:parent_dashboard')  # or return 403
+def payer_profile_view(request):
+    if request.user.user_type != 'payer':
+        return redirect('payer_dashboard')  # or return 403
 
     if request.method == 'POST':
-        form = ParentProfileForm(request.POST, instance=request.user)
+        form = PayerProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
-            return redirect('tuition:parent_profile')
+            return redirect('payer_profile')
     else:
-        form = ParentProfileForm(instance=request.user)
+        form = PayerProfileForm(instance=request.user)
 
-    return render(request, 'tuition/parent_profile.html', {'form': form})
+    return render(request, 'tuition/payer_profile.html', {'form': form})
+
+@login_required
+def edit_payer_profile(request):
+    if request.method == 'POST':
+        form = EditPayerProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('payer_profile')  # Or wherever you want to redirect after saving
+    else:
+        form = EditPayerProfileForm(instance=request.user)
+
+    return render(request, 'tuition/edit_payer_profile.html', {'form': form})
