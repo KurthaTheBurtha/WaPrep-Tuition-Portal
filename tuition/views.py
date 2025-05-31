@@ -552,8 +552,8 @@ Please review and follow up accordingly.
             send_mail(
                 subject,
                 message,  
-                "burthathekurtha@gmail.com",  # Uses DEFAULT_FROM_EMAIL
-                ['burthathekurtha@gmail.com'],
+                "kschimmel@waprep.org",  # Uses DEFAULT_FROM_EMAIL
+                ['kschimmel@waprep.org'],
                 fail_silently=False,
             )
 
