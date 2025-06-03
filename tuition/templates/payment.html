@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="mb-4">Make a Payment</h2>
+
+            <div class="mb-4">
+                <h5>Payment Summary</h5>
+                <p><strong>Amount Due:</strong> ${{ amount_due }}</p>
+                <p><strong>Due Date:</strong> {{ due_date }}</p>
+            </div>
+
+            <form method="post" action="{% url 'process_payment' %}">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="account_holder" class="form-label">Account Holder Name</label>
+                    <input type="text" name="account_holder" id="account_holder" class="form-control" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="routing_number" class="form-label">Routing Number</label>
+                    <input type="text" name="routing_number" id="routing_number" class="form-control" placeholder="e.g., 011000015" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="account_number" class="form-label">Account Number</label>
+                    <input type="text" name="account_number" id="account_number" class="form-control" placeholder="e.g., 123456789" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="account_type" class="form-label">Account Type</label>
+                    <select name="account_type" id="account_type" class="form-control" required>
+                        <option value="">Select one</option>
+                        <option value="checking">Checking</option>
+                        <option value="savings">Savings</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Pay Now with ACH</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
