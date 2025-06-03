@@ -15,13 +15,13 @@ from django.conf import settings
 from .forms import PayerProfileForm
 from .forms import EditPayerProfileForm
 from django.db.models import Sum
-
+from decouple import config
 
 
 # Create your views here.
 
 def home(request):
-    return render(request, 'tuition/select_login.html', {'show_navbar': False})
+    return render(request, 'select_login.html', {'show_navbar': False})
 
 def payer_login(request):
     if request.method == 'POST':
@@ -43,7 +43,7 @@ def payer_login(request):
         except User.DoesNotExist:
             messages.error(request, 'Invalid email or password for payer account.')
     
-    return render(request, 'tuition/payer_login.html', {'hide_nav_items': True})
+    return render(request, 'payer_login.html', {'hide_nav_items': True})
 
 def payer_signup(request):
     if request.method == 'POST':
@@ -63,7 +63,7 @@ def payer_signup(request):
             messages.success(request, "Account created successfully.")
             return redirect('payer_dashboard')
 
-    return render(request, 'tuition/payer_signup.html')
+    return render(request, 'payer_signup.html')
 
 def admin_login(request):
     if request.method == 'POST':
@@ -85,7 +85,7 @@ def admin_login(request):
         except User.DoesNotExist:
             messages.error(request, 'Invalid email or password for admin account.')
     
-    return render(request, 'tuition/admin_login.html', {'hide_nav_items': True})
+    return render(request, 'admin_login.html', {'hide_nav_items': True})
 
 def logout_view(request):
     logout(request)
@@ -104,7 +104,7 @@ def payment(request):
         'amount_due': 500.00,
         'due_date': (timezone.now() + timedelta(days=15)).strftime('%B %d, %Y')
     }
-    return render(request, 'tuition/payment.html', context)
+    return render(request, 'payment.html', context)
 
 @login_required
 def process_payment(request):
@@ -145,7 +145,7 @@ def payment_history(request):
             'status': 'Completed'
         }
     ]
-    return render(request, 'tuition/payment_history.html', {'payments': payments})
+    return render(request, 'payment_history.html', {'payments': payments})
 
 @login_required
 def download_receipt(request, payment_id):
@@ -187,10 +187,10 @@ def admin_dashboard(request):
             }
         ]
     }
-    return render(request, 'tuition/admin_dashboard.html', context)
+    return render(request, 'admin_dashboard.html', context)
 
 def forgot_password(request):
-    return render(request, 'tuition/forgot_password.html')
+    return render(request, 'forgot_password.html')
 
 @login_required
 def students(request):
@@ -205,7 +205,7 @@ def students(request):
         'students': students,
         'payers': payers,
     }
-    return render(request, 'tuition/students.html', context)
+    return render(request, 'students.html', context)
 
 def generate_student_id(first_name, last_name, birthday):
     """
@@ -305,7 +305,7 @@ def delete_student(request):
     return redirect('students')
 
 def select_login(request):
-    return render(request, 'tuition/select_login.html', {'show_navbar': False})
+    return render(request, 'select_login.html', {'show_navbar': False})
 
 @login_required
 def update_student_notes(request):
@@ -461,7 +461,7 @@ def admin_reports(request):
         'monthly_totals': monthly_totals,
         'payments': payments,
     }
-    return render(request, 'tuition/admin_reports.html', context)
+    return render(request, 'admin_reports.html', context)
 
 @login_required
 def payer_dashboard(request):
@@ -481,7 +481,7 @@ def payer_dashboard(request):
         'total_amount_owed': total_amount_owed,
 
     }
-    return render(request, 'tuition/payer_dashboard.html', context)
+    return render(request, 'payer_dashboard.html', context)
 
 @login_required
 def add_student_to_payer(request):
@@ -526,7 +526,7 @@ def student_profile(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     payers = User.objects.filter(user_type='payer')  # filter to only payer users
 
-    return render(request, 'tuition/student_profile.html', {
+    return render(request, 'student_profile.html', {
         'student': student,
         'payers': payers,
     })
@@ -538,7 +538,7 @@ def request_account_view(request):
             request_obj = form.save()
 
             # Email content
-            subject = 'New payer Account Request'
+            subject = 'New Payer Account Request'
             message = f"""
 A new payer has submitted an account request:
 
@@ -552,7 +552,7 @@ Please review and follow up accordingly.
             send_mail(
                 subject,
                 message,  
-                "kschimmel@waprep.org",  # Uses DEFAULT_FROM_EMAIL
+                config('DEFAULT_FROM_EMAIL'),  # Uses DEFAULT_FROM_EMAIL
                 ['kschimmel@waprep.org'],
                 fail_silently=False,
             )
@@ -562,13 +562,13 @@ Please review and follow up accordingly.
     else:
         form = AccountRequestForm()
     
-    return render(request, 'tuition/request_account.html', {'form': form})
+    return render(request, 'request_account.html', {'form': form})
 
 @login_required
 def payer_welcome(request):
     if request.user.user_type != 'payer':
         return redirect('admin_login')  # or show 403
-    return render(request, 'tuition/payer_welcome.html')
+    return render(request, 'payer_welcome.html')
 
 @login_required
 def payer_profile_view(request):
@@ -583,7 +583,7 @@ def payer_profile_view(request):
     else:
         form = PayerProfileForm(instance=request.user)
 
-    return render(request, 'tuition/payer_profile.html', {'form': form})
+    return render(request, 'payer_profile.html', {'form': form})
 
 @login_required
 def edit_payer_profile(request):
@@ -595,4 +595,4 @@ def edit_payer_profile(request):
     else:
         form = EditPayerProfileForm(instance=request.user)
 
-    return render(request, 'tuition/edit_payer_profile.html', {'form': form})
+    return render(request, 'edit_payer_profile.html', {'form': form})
