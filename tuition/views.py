@@ -12,8 +12,7 @@ from django.core.mail import send_mail
 from django.db import models
 from .forms import AccountRequestForm
 from django.conf import settings
-from .forms import PayerProfileForm
-from .forms import EditPayerProfileForm
+from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
 from django.db.models import Sum
 from decouple import config
 
@@ -596,3 +595,56 @@ def edit_payer_profile(request):
         form = EditPayerProfileForm(instance=request.user)
 
     return render(request, 'edit_payer_profile.html', {'form': form})
+
+@login_required
+def ask_question_view(request):
+    if request.user.user_type != 'payer':
+        messages.error(request, 'Only payers can ask questions.')
+        return redirect('payer_login')
+
+    # Get only the logged-in payer's students
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
+    student_choices = [(s.id, f"{s.first_name} {s.last_name} (Balance: ${s.current_balance:.2f} | Due: {s.due_date.strftime('%b %d, %Y') if s.due_date else 'No due date'})") for s in my_students]
+
+    if request.method == 'POST':
+        form = QuestionForm(student_choices, request.POST)
+        if form.is_valid():
+            subject = form.cleaned_data['subject']
+            student_ids = form.cleaned_data['students']
+            message = form.cleaned_data['message']
+
+            selected_students = Student.objects.filter(id__in=student_ids)
+            student_lines = []
+            for s in selected_students:
+                balance = f"${s.current_balance:.2f}" if s.current_balance is not None else "N/A"
+                due = s.due_date.strftime("%b %d, %Y") if s.due_date else "No due date"
+                student_lines.append(f"{s.first_name} {s.last_name} – Balance: {balance}, Due: {due}")
+
+            email_subject = f"Question from Payer: {subject}"
+            email_body = f"""
+A Payer has submitted a question:
+
+Name: {request.user.get_full_name()}
+
+Students:
+{chr(10).join(student_lines) if student_lines else 'None selected'}
+
+Message:
+{message}
+""".strip()
+
+            send_mail(
+                email_subject,
+                email_body,
+                settings.DEFAULT_FROM_EMAIL,
+                ['kschimmel@waprep.org'],
+                fail_silently=False,
+            )
+
+            messages.success(request, 'Your question has been submitted. We will contact you soon.')
+            return redirect('payer_dashboard')
+    else:
+        form = QuestionForm(student_choices)
+
+    # Return to payer_dashboard.html or a dedicated ask_question.html
+    return render(request, 'payer_dashboard.html', {'form': form})

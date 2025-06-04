@@ -31,4 +31,5 @@ urlpatterns = [
     path('request-account/', views.request_account_view, name='request_account'),
     path('payer/profile/', views.payer_profile_view, name='payer_profile'),
     path('payer/edit-profile/', views.edit_payer_profile, name='edit_payer_profile'),
-] 
+    path('ask-question/', views.ask_question_view, name='ask_question'),
+]  

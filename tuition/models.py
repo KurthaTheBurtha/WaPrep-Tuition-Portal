@@ -14,7 +14,7 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     contact_info = models.TextField(blank=True)
-    
+     
     def is_admin(self):
         return self.user_type == 'admin'
 
@@ -35,6 +35,7 @@ class Student(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     current_balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    due_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

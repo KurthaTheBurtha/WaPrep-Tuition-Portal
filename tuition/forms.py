@@ -19,3 +19,12 @@ class EditPayerProfileForm(forms.ModelForm):
             'address': forms.Textarea(attrs={'rows': 2}),
             'contact_info': forms.Textarea(attrs={'rows': 2}),
         }
+        
+class QuestionForm(forms.Form):
+    subject = forms.CharField(max_length=100)
+    students = forms.MultipleChoiceField(choices=[], required=False)
+    message = forms.CharField(widget=forms.Textarea)
+
+    def __init__(self, student_choices, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['students'].choices = student_choices
