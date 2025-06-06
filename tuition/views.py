@@ -589,8 +589,38 @@ def edit_payer_profile(request):
     if request.method == 'POST':
         form = EditPayerProfileForm(request.POST, instance=request.user)
         if form.is_valid():
-            form.save()
-            return redirect('payer_profile')  # Or wherever you want to redirect after saving
+            # Gather data but don't save
+            cleaned_data = form.cleaned_data
+            subject = 'Payer Profile Update Request'
+            message = f"""
+A user has requested a profile update.
+
+User ID: {request.user.id}
+Name: {request.user.get_full_name()}
+Email: {request.user.email}
+
+Requested Changes:
+------------------
+First Name: {cleaned_data.get('first_name')}
+Last Name: {cleaned_data.get('last_name')}
+Email: {cleaned_data.get('email')}
+Phone Number: {cleaned_data.get('phone_number')}
+Address: {cleaned_data.get('address')}
+Contact Info: {cleaned_data.get('contact_info')}
+
+Please review and apply changes manually if appropriate.
+    """
+
+            # Send email to provider
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                ['kschimmel@waprep.org'],  # change to actual recipient
+                fail_silently=False
+            )
+            messages.success(request, "Your profile update request has been sent successfully.")
+            return redirect('payer_profile')  # Redirect after request submitted
     else:
         form = EditPayerProfileForm(instance=request.user)
 
