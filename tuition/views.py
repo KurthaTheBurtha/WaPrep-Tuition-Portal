@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, Studentpayer, BankAccount
+from .models import User, Student, Payment, Studentpayer, BankAccount, PaymentBreakdown
 import random
 import string
 from django.core.mail import send_mail
@@ -101,21 +101,34 @@ def logout_view(request):
 def payment(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     
-    # Get payment breakdown items
-    breakdown_items = student.payment_breakdowns.filter(is_paid=False)
-    total_amount = breakdown_items.aggregate(total=models.Sum('amount'))['total'] or 0
+    # Get current month and year
+    now = timezone.now()
+    current_month = now.month
+    current_year = now.year
+    
+    # Get only current month's payment breakdown items
+    breakdown_items = PaymentBreakdown.objects.filter(
+        student=student,
+        is_paid=False,
+        due_date__year=current_year,
+        due_date__month=current_month
+    ).order_by('due_date')
+    
+    # Calculate total amount due for current month
+    total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
     
     # Get user's saved bank accounts
     bank_accounts = BankAccount.objects.filter(user=request.user)
     
     context = {
-        "student_name": f"{student.first_name} {student.last_name}",
-        "total_amount_due": total_amount,
-        "due_date": student.due_date,
-        "breakdown_items": breakdown_items,
-        "student_id": student_id,
-        "bank_accounts": bank_accounts
+        'student_name': f"{student.first_name} {student.last_name}",
+        'total_amount_due': total_amount_due,
+        'breakdown_items': breakdown_items,
+        'bank_accounts': bank_accounts,
+        'student_id': student_id,
+        'current_month': now.strftime('%B %Y')  # e.g., "March 2024"
     }
+    
     return render(request, 'payment.html', context)
 
 @login_required
@@ -549,20 +562,43 @@ def payer_dashboard(request):
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
 
+    # Get current month and year
+    current_date = timezone.now()
+    current_month = current_date.month
+    current_year = current_date.year
+
     # Calculate total amount owed and get payment breakdowns
     total_amount_owed = 0
+    current_month_total = 0
+    
     for student in my_students:
-        # Get unpaid payment breakdown items
+        # Get all unpaid payment breakdown items
         breakdown_items = student.payment_breakdowns.filter(is_paid=False)
+        
+        # Get current month's items
+        current_month_items = breakdown_items.filter(
+            due_date__month=current_month,
+            due_date__year=current_year
+        )
+        
+        # Calculate totals
         student_total = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
+        student_month_total = current_month_items.aggregate(total=Sum('amount'))['total'] or 0
+        
         total_amount_owed += student_total
+        current_month_total += student_month_total
+        
         # Add breakdown items to student object for template access
         student.breakdown_items = breakdown_items
+        student.current_month_items = current_month_items
         student.total_due = student_total
+        student.monthly_due = student_month_total
     
     context = {
         'my_students': my_students,
         'total_amount_owed': total_amount_owed,
+        'current_month_total': current_month_total,
+        'current_month': current_date.strftime('%B %Y'),
     }
     return render(request, 'payer_dashboard.html', context)
 
