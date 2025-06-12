@@ -1,10 +1,12 @@
 from django.urls import path
+from django.contrib import admin
 from . import views
 
 app_name = 'tuition'
 
 urlpatterns = [
     path('', views.home, name='home'),
+    path('admin/', admin.site.urls),
     path('login/payer/', views.payer_login, name='payer_login'),
     path('login/admin/', views.admin_login, name='admin_login'),
     path('logout/', views.logout_view, name='logout'),
@@ -14,7 +16,7 @@ urlpatterns = [
     path('students/delete/', views.delete_student, name='delete_student'),
     path('students/update/', views.update_student, name='update_student'),
     path('students/update-notes/', views.update_student_notes, name='update_student_notes'),
-    path('payment/', views.payment, name='payment'),
+    path('payment/<int:student_id>/', views.payment, name='payment'),
     path('payment/process/', views.process_payment, name='process_payment'),
     path('payment/history/', views.payment_history, name='payment_history'),
     path('payment/receipt/<int:payment_id>/', views.download_receipt, name='download_receipt'),
@@ -32,4 +34,5 @@ urlpatterns = [
     path('payer/profile/', views.payer_profile_view, name='payer_profile'),
     path('payer/edit-profile/', views.edit_payer_profile, name='edit_payer_profile'),
     path('ask-question/', views.ask_question_view, name='ask_question'),
+    path('add-bank-account/', views.add_bank_account, name='add_bank_account')
 ]  

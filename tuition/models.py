@@ -14,6 +14,7 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     contact_info = models.TextField(blank=True)
+    user_id = models.CharField(max_length=30, unique=True, null=True, blank=False)
      
     def is_admin(self):
         return self.user_type == 'admin'
@@ -73,12 +74,26 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    bank_account = models.ForeignKey('BankAccount', on_delete=models.PROTECT, related_name='payments', null=True, blank=True)
+    # Keep these fields for backward compatibility and for payments made without a saved bank account
+    routing_number = models.CharField(max_length=9, null=True, blank=True)
+    account_number = models.CharField(max_length=20, null=True, blank=True)
+    account_type = models.CharField(max_length=10, null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
     receipt_number = models.CharField(max_length=50, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Payment for {self.student} - {self.amount}"
+
+    def save(self, *args, **kwargs):
+        # If a bank account is provided, populate the routing_number, account_number, and account_type
+        if self.bank_account and not self.routing_number:
+            token_parts = self.bank_account.provider_token.split('_')
+            if len(token_parts) == 2:
+                self.routing_number = token_parts[0]
+                self.account_number = token_parts[1]
+                self.account_type = self.bank_account.account_type
+        super().save(*args, **kwargs)
 
 class PaymentReceipt(models.Model):
     payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='receipt')
@@ -135,3 +150,34 @@ class AccountRequest(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} - Account Request"
+    
+class Vendor(models.Model):
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    bill_vendor_id = models.CharField(max_length=64)
+
+class BankAccount(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_accounts')
+    nickname = models.CharField(max_length=50, help_text="Label this account (e.g., 'Mom Checking')")
+    account_type = models.CharField(max_length=10, choices=[('checking', 'Checking'), ('savings', 'Savings')])
+    last4 = models.CharField(max_length=4)  # Only store last 4 digits
+    provider_token = models.CharField(max_length=255)  # Token from payment provider
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nickname} (...{self.last4})"
+
+class PaymentBreakdown(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payment_breakdowns')
+    description = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    due_date = models.DateField(null=True, blank=True)
+    is_paid = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.description} - ${self.amount}"
+
+    class Meta:
+        ordering = ['due_date', 'created_at']

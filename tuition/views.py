@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, Studentpayer
+from .models import User, Student, Payment, Studentpayer, BankAccount
 import random
 import string
 from django.core.mail import send_mail
@@ -15,6 +15,14 @@ from django.conf import settings
 from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
 from django.db.models import Sum
 from decouple import config
+from .bill_api import (
+    get_session_id,
+    create_vendor,
+    create_bank_account,
+    create_bill,
+    pay_bill
+)
+
 
 
 # Create your views here.
@@ -24,24 +32,22 @@ def home(request):
 
 def payer_login(request):
     if request.method == 'POST':
-        email = request.POST.get('email')
+        username = request.POST.get('username')
         password = request.POST.get('password')
         remember = request.POST.get('remember')
-        
-        try:
-            user = User.objects.get(email=email)
-            if user.check_password(password) and user.user_type == 'payer':
-                login(request, user)
-                
-                if not remember:
-                    request.session.set_expiry(0)  # Session expires when browser closes
-                
-                return redirect('payer_welcome')  # Redirect to payer dashboard
-            else:
-                messages.error(request, 'Invalid email or password for payer account.')
-        except User.DoesNotExist:
-            messages.error(request, 'Invalid email or password for payer account.')
-    
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None and user.user_type == 'payer':
+            login(request, user)
+
+            if not remember:
+                request.session.set_expiry(0)  # Session expires when browser closes
+
+            return redirect('payer_welcome')
+        else:
+            messages.error(request, 'Invalid username or password for payer account.')
+
     return render(request, 'payer_login.html', {'hide_nav_items': True})
 
 def payer_signup(request):
@@ -92,35 +98,106 @@ def logout_view(request):
     return redirect('home')
 
 @login_required
-def payment(request):
-    # Only allow payer users
-    if request.user.user_type != 'payer':
-        messages.error(request, 'You do not have permission to access this page.')
-        return redirect('admin_login')
-        
-    # In a real application, these would come from a database
+def payment(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Get payment breakdown items
+    breakdown_items = student.payment_breakdowns.filter(is_paid=False)
+    total_amount = breakdown_items.aggregate(total=models.Sum('amount'))['total'] or 0
+    
+    # Get user's saved bank accounts
+    bank_accounts = BankAccount.objects.filter(user=request.user)
+    
     context = {
-        'amount_due': 500.00,
-        'due_date': (timezone.now() + timedelta(days=15)).strftime('%B %d, %Y')
+        "student_name": f"{student.first_name} {student.last_name}",
+        "total_amount_due": total_amount,
+        "due_date": student.due_date,
+        "breakdown_items": breakdown_items,
+        "student_id": student_id,
+        "bank_accounts": bank_accounts
     }
     return render(request, 'payment.html', context)
 
 @login_required
 def process_payment(request):
-    # Only allow payer users
-    if request.user.user_type != 'payer':
-        messages.error(request, 'You do not have permission to access this page.')
-        return redirect('admin_login')
-        
     if request.method == 'POST':
-        # In a real application, you would:
-        # 1. Validate the payment details
-        # 2. Process the payment through a payment gateway
-        # 3. Store the payment record in the database
-        # 4. Send a confirmation email
-        messages.success(request, 'Payment processed successfully!')
-        return redirect('payment_history')
-    return redirect('payment')
+        student_id = request.POST.get('student_id')
+        student = get_object_or_404(Student, id=student_id)
+        amount = request.POST.get('amount')
+        payment_method = request.POST.get('payment_method')
+        
+        try:
+            # Get BILL session
+            session_id = get_session_id()
+            
+            if payment_method == 'new':
+                # Use new bank account details
+                name = request.POST.get('account_holder')
+                routing_number = request.POST.get('routing_number')
+                account_number = request.POST.get('account_number')
+                account_type = request.POST.get('account_type')
+                
+                # Save new bank account if user is a payer
+                if request.user.user_type == 'payer':
+                    bank_account = BankAccount.objects.create(
+                        user=request.user,
+                        nickname=f"{name}'s {account_type.capitalize()}",
+                        account_type=account_type,
+                        last4=account_number[-4:],
+                        provider_token=f"{routing_number}_{account_number}"
+                    )
+            else:
+                # Use existing bank account
+                bank_account = BankAccount.objects.get(id=payment_method, user=request.user)
+                name = request.user.get_full_name()
+                token_parts = bank_account.provider_token.split('_')
+                routing_number = token_parts[0]
+                account_number = token_parts[1]
+                account_type = bank_account.account_type
+            
+            # Create vendor
+            vendor_id = create_vendor(session_id, {
+                "name": name,
+                "email": request.user.email
+            })
+            
+            # Create bank account in BILL
+            bank_response = create_bank_account(session_id, vendor_id, {
+                "bankAccountNumber": account_number,
+                "routingNumber": routing_number,
+                "accountType": account_type,
+                "bankAccountName": name
+            })
+            
+            # Create bill
+            bill_id = create_bill(session_id, vendor_id, {
+                "amount": str(amount),
+                "description": f"Tuition payment for {student.first_name} {student.last_name}"
+            })
+            
+            # Process payment
+            payment_response = pay_bill(session_id, bill_id)
+            
+            # Create payment record
+            payment = Payment.objects.create(
+                student=student,
+                amount=amount,
+                status='pending',
+                bank_account=bank_account if 'bank_account' in locals() else None,
+                routing_number=routing_number,
+                account_number=account_number,
+                account_type=account_type,
+                receipt_number=payment_response.get('id', '')  # Use BILL payment ID as receipt number
+            )
+            
+            messages.success(request, f"✅ Payment of ${amount} submitted successfully. A receipt will be available once the payment is processed.")
+            return redirect('payment_history')
+            
+        except Exception as e:
+            messages.error(request, f"Payment failed: {str(e)}")
+            return redirect('payment', student_id=student_id)
+    
+    return redirect('payment_history')
 
 @login_required
 def payment_history(request):
@@ -472,13 +549,20 @@ def payer_dashboard(request):
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
 
-    # Calculate total amount owed
-    total_amount_owed = my_students.aggregate(total=Sum('current_balance'))['total'] or 0
+    # Calculate total amount owed and get payment breakdowns
+    total_amount_owed = 0
+    for student in my_students:
+        # Get unpaid payment breakdown items
+        breakdown_items = student.payment_breakdowns.filter(is_paid=False)
+        student_total = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
+        total_amount_owed += student_total
+        # Add breakdown items to student object for template access
+        student.breakdown_items = breakdown_items
+        student.total_due = student_total
     
     context = {
         'my_students': my_students,
         'total_amount_owed': total_amount_owed,
-
     }
     return render(request, 'payer_dashboard.html', context)
 
@@ -593,9 +677,9 @@ def edit_payer_profile(request):
             cleaned_data = form.cleaned_data
             subject = 'Payer Profile Update Request'
             message = f"""
-A user has requested a profile update.
+A payer has requested a profile update.
 
-User ID: {request.user.id}
+User ID: {request.user.username}
 Name: {request.user.get_full_name()}
 Email: {request.user.email}
 
@@ -652,9 +736,11 @@ def ask_question_view(request):
 
             email_subject = f"Question from Payer: {subject}"
             email_body = f"""
-A Payer has submitted a question:
+A Payer has submitted a question from their dashboard:
 
+User ID: {request.user.username}
 Name: {request.user.get_full_name()}
+Email: {request.user.email}
 
 Students:
 {chr(10).join(student_lines) if student_lines else 'None selected'}
@@ -678,3 +764,33 @@ Message:
 
     # Return to payer_dashboard.html or a dedicated ask_question.html
     return render(request, 'payer_dashboard.html', {'form': form})
+
+def add_vendor_view(request):
+    if request.method == 'POST':
+        vendor_data = {
+            "name": request.POST['name'],
+            "email": request.POST['email']
+        }
+        session_id = get_session_id()
+        result = create_vendor(session_id, vendor_data)
+        # Save to your local DB if needed
+        return redirect('success_page')
+
+    return render(request, 'add_vendor.html')
+
+@login_required
+def add_bank_account(request):
+    if request.method == 'POST':
+        form = BankAccountForm(request.POST)
+        if form.is_valid():
+            bank_account = form.save(commit=False)
+            bank_account.payer = request.user  # assumes user is logged in as a payer
+            # Store only last 4 digits for security
+            full_account_number = request.POST.get('account_number')
+            bank_account.account_number_last4 = full_account_number[-4:]
+            bank_account.save()
+            messages.success(request, "Bank account added successfully.")
+            return redirect('make_payment')
+    else:
+        form = BankAccountForm()
+    return render(request, 'add_bank_account.html', {'form': form})

@@ -2,47 +2,135 @@
 {% load static %}
 
 {% block content %}
-<div class="container my-5">
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h2 class="mb-4">Make a Payment</h2>
+<div class="container mt-4">
+    <div class="row">
+        <!-- <div class="col-md-8 offset-md-2"> -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Payment Details</h4>
+                </div>
+                <div class="card-body">
+                    <div class="payment-summary mb-4">
+                        <h5>Payment Summary</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Student:</strong> {{ student_name }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Total Amount Due:</strong> ${{ total_amount_due|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="mb-4">
-                <h5>Payment Summary</h5>
-                <p><strong>Amount Due:</strong> ${{ amount_due }}</p>
-                <p><strong>Due Date:</strong> {{ due_date }}</p>
+                    <div class="payment-breakdown">
+                        <h5>Payment Breakdown</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>Due Date</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in breakdown_items %}
+                                    <tr>
+                                        <td>{{ item.description }}</td>
+                                        <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                        <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="2" class="text-end"><strong>Total Due:</strong></td>
+                                        <td class="text-end"><strong>${{ total_amount_due|floatformat:2 }}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <form method="post" action="{% url 'process_payment' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="student_id" value="{{ student_id }}">
+                            <input type="hidden" name="amount" value="{{ total_amount_due }}">
+                            
+                            <div class="mb-3">
+                                <label for="payment_method" class="form-label">Select Payment Method</label>
+                                <select class="form-select" id="payment_method" name="payment_method" required>
+                                    <option value="">Choose a payment method...</option>
+                                    {% if bank_accounts %}
+                                        {% for account in bank_accounts %}
+                                            <option value="{{ account.id }}">
+                                                {{ account.nickname }} ({{ account.account_type|title }} - ****{{ account.last4 }})
+                                            </option>
+                                        {% endfor %}
+                                    {% endif %}
+                                    <option value="new">+ Add New Payment Method</option>
+                                </select>
+                            </div>
+
+                            <div id="new_payment_method" class="d-none">
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title">New Payment Method</h6>
+                                        <div class="mb-3">
+                                            <label for="account_holder" class="form-label">Account Holder Name</label>
+                                            <input type="text" class="form-control" id="account_holder" name="account_holder">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="account_type" class="form-label">Account Type</label>
+                                            <select class="form-select" id="account_type" name="account_type">
+                                                <option value="checking">Checking</option>
+                                                <option value="savings">Savings</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="routing_number" class="form-label">Routing Number</label>
+                                            <input type="text" class="form-control" id="routing_number" name="routing_number" pattern="[0-9]{9}" maxlength="9">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="account_number" class="form-label">Account Number</label>
+                                            <input type="text" class="form-control" id="account_number" name="account_number">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    Proceed to Payment
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
-
-            <form method="post" action="{% url 'process_payment' %}">
-                {% csrf_token %}
-
-                <div class="mb-3">
-                    <label for="account_holder" class="form-label">Account Holder Name</label>
-                    <input type="text" name="account_holder" id="account_holder" class="form-control" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="routing_number" class="form-label">Routing Number</label>
-                    <input type="text" name="routing_number" id="routing_number" class="form-control" placeholder="e.g., 011000015" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="account_number" class="form-label">Account Number</label>
-                    <input type="text" name="account_number" id="account_number" class="form-control" placeholder="e.g., 123456789" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="account_type" class="form-label">Account Type</label>
-                    <select name="account_type" id="account_type" class="form-control" required>
-                        <option value="">Select one</option>
-                        <option value="checking">Checking</option>
-                        <option value="savings">Savings</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100">Pay Now with ACH</button>
-            </form>
-        </div>
+        <!-- </div> -->
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+document.getElementById('payment_method').addEventListener('change', function() {
+    const newPaymentMethod = document.getElementById('new_payment_method');
+    if (this.value === 'new') {
+        newPaymentMethod.classList.remove('d-none');
+        // Make new payment method fields required
+        document.getElementById('account_holder').required = true;
+        document.getElementById('routing_number').required = true;
+        document.getElementById('account_number').required = true;
+    } else {
+        newPaymentMethod.classList.add('d-none');
+        // Make new payment method fields not required
+        document.getElementById('account_holder').required = false;
+        document.getElementById('routing_number').required = false;
+        document.getElementById('account_number').required = false;
+    }
+});
+</script>
+{% endblock %}
 {% endblock %}
