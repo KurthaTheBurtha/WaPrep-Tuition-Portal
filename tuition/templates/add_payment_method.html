@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Add Payment Method</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'add_payment_method' %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="nickname" class="form-label">Account Nickname</label>
+                            <input type="text" class="form-control" id="nickname" name="nickname" required
+                                   placeholder="e.g., My Checking Account">
+                            <div class="form-text">Give your account a nickname to easily identify it later.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="account_type" class="form-label">Account Type</label>
+                            <select class="form-select" id="account_type" name="account_type" required>
+                                <option value="">Select account type...</option>
+                                <option value="checking">Checking</option>
+                                <option value="savings">Savings</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="routing_number" class="form-label">Routing Number</label>
+                            <input type="text" class="form-control" id="routing_number" name="routing_number" 
+                                   pattern="[0-9]{9}" maxlength="9" required>
+                            <div class="form-text">9-digit routing number</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="account_number" class="form-label">Account Number</label>
+                            <input type="text" class="form-control" id="account_number" name="account_number" required>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                Save Payment Method
+                            </button>
+                            <a href="{% url 'payer_dashboard' %}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

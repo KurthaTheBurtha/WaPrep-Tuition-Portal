@@ -11,7 +11,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
                             <i class="fas fa-dollar-sign text-danger fa-2x"></i>
                         </div>
                         <div>
@@ -27,39 +27,32 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-question-circle text-danger fa-2x"></i>
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-question-circle text-primary fa-2x"></i>
                         </div>
                         <div>
-                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#askQuestionModal">
+                            <h6 class="card-subtitle mb-1 text-muted">Need Help?</h6>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#askQuestionModal">
                                 Ask a Question
                             </button>
                         </div>
                     </div>
-                    {% if messages %}
-                        <div class="messages">
-                            {% for message in messages %}
-                            <div class="alert alert-{{ message.tags }}">
-                                {{ message }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
-        <!-- Add Bank Account Card -->
+        <!-- Add Payment Method Card -->
         <div class="col-12 col-md-4">
             <div class="card shadow-sm h-100">
-                <div class="card-body d-flex flex-column justify-content-between">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-university text-primary fa-2x"></i>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-credit-card text-success fa-2x"></i>
                         </div>
-                        <div class="d-flex justify-content-center">
-                            <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addBankModal">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Payment Methods</h6>
+                            <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success btn-sm">
                                 Add Payment Method
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -168,20 +161,27 @@
                         <input type="text" class="form-control" id="subject" name="subject" required>
                     </div>
                     <div class="mb-3">
-                        <label for="students" class="form-label">Select Students</label>
-                        <select class="form-select" id="students" name="students" multiple>
+                        <label class="form-label">Select Students</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
                             {% for student in my_students %}
-                                <option value="{{ student.id }}">
-                                    {{ student.first_name }} {{ student.last_name }} 
-                                    (Balance: ${{ student.balance|default:"0.00"|floatformat:2 }} | Due: {{ student.due_date|date:"M d, Y"|default:"No due date" }})
-                                </option>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="students" value="{{ student.id }}" id="student_{{ student.id }}">
+                                <label class="form-check-label" for="student_{{ student.id }}">
+                                    {{ student.first_name }} {{ student.last_name }}
+                                    <small class="text-muted d-block">
+                                        Total Due: ${{ student.total_due|floatformat:2 }} | 
+                                        {{ current_month }} Due: ${{ student.monthly_due|floatformat:2 }}
+                                        {% if student.current_month_items %}
+                                        <br>
+                                        Next Due: {{ student.current_month_items.first.due_date|date:"M d, Y" }}
+                                        {% endif %}
+                                    </small>
+                                </label>
+                            </div>
                             {% endfor %}
-                        </select>
-                        <div class="form-text">
-                            <strong>How to select students:</strong><br>
-                            - <strong>Select one:</strong> Click on a student.<br>
-                            - <strong>Select multiple:</strong> Hold <kbd>Ctrl</kbd> (Windows) or <kbd>Command</kbd> (Mac) and click to add or remove students.<br>
-                            - <strong>Unselect one:</strong> Hold <kbd>Ctrl</kbd>/<kbd>Command</kbd> and click the selected student.
+                        </div>
+                        <div class="form-text mt-2">
+                            <strong>Note:</strong> You can select multiple students if your question applies to more than one.
                         </div>
                     </div>
                     <div class="mb-3">

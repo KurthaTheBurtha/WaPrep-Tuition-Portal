@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, Studentpayer, BankAccount, PaymentBreakdown
+from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown
 import random
 import string
 from django.core.mail import send_mail
@@ -168,25 +168,60 @@ def process_payment(request):
                 account_number = token_parts[1]
                 account_type = bank_account.account_type
             
-            # Create vendor
-            vendor_id = create_vendor(session_id, {
+            # Create vendor in BILL
+            vendor_data = {
                 "name": name,
-                "email": request.user.email
-            })
+                "email": request.user.email,
+                "accountType": "PERSON",
+                "phone": request.user.phone_number if hasattr(request.user, 'phone_number') else None,
+                "address": {
+                    "line1": request.user.address if hasattr(request.user, 'address') else None,
+                    "city": "Seattle",  # Default to Seattle
+                    "zipOrPostalCode": "98101",  # Default ZIP
+                    "country": "US"
+                }
+            }
+            vendor_response = create_vendor(session_id, vendor_data)
+            vendor_id = vendor_response['id']
             
             # Create bank account in BILL
-            bank_response = create_bank_account(session_id, vendor_id, {
+            bank_data = {
                 "bankAccountNumber": account_number,
                 "routingNumber": routing_number,
-                "accountType": account_type,
+                "accountType": account_type.upper(),
                 "bankAccountName": name
-            })
+            }
+            bank_response = create_bank_account(session_id, vendor_id, bank_data)
             
-            # Create bill
-            bill_id = create_bill(session_id, vendor_id, {
+            # Get current month's payment items
+            now = timezone.now()
+            current_month = now.month
+            current_year = now.year
+            payment_items = PaymentBreakdown.objects.filter(
+                student=student,
+                is_paid=False,
+                due_date__year=current_year,
+                due_date__month=current_month
+            )
+            
+            # Create line items for the bill
+            line_items = []
+            for item in payment_items:
+                line_items.append({
+                    "amount": str(item.amount),
+                    "description": item.description
+                })
+            
+            # Create bill in BILL
+            bill_data = {
                 "amount": str(amount),
-                "description": f"Tuition payment for {student.first_name} {student.last_name}"
-            })
+                "description": f"Tuition payment for {student.first_name} {student.last_name}",
+                "invoiceNumber": f"INV-{student.id}-{now.strftime('%Y%m%d')}",
+                "dueDate": now.strftime('%Y-%m-%d'),
+                "lineItems": line_items
+            }
+            bill_response = create_bill(session_id, vendor_id, bill_data)
+            bill_id = bill_response['id']
             
             # Process payment
             payment_response = pay_bill(session_id, bill_id)
@@ -200,8 +235,11 @@ def process_payment(request):
                 routing_number=routing_number,
                 account_number=account_number,
                 account_type=account_type,
-                receipt_number=payment_response.get('id', '')  # Use BILL payment ID as receipt number
+                receipt_number=payment_response.get('id', '')
             )
+            
+            # Mark payment items as paid
+            payment_items.update(is_paid=True)
             
             messages.success(request, f"✅ Payment of ${amount} submitted successfully. A receipt will be available once the payment is processed.")
             return redirect('payment_history')
@@ -359,7 +397,7 @@ def add_student(request):
             # Add payer relationship
             if payer_id:
                 payer = User.objects.get(id=payer_id)
-                Studentpayer.objects.create(
+                StudentPayer.objects.create(
                     student=student,
                     payer=payer,
                     relationship=relationship,
@@ -465,9 +503,9 @@ def add_payer_to_student(request):
             
             # If this is set as primary, unset any existing primary payer
             if is_primary:
-                Studentpayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
+                StudentPayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
             
-            Studentpayer.objects.create(
+            StudentPayer.objects.create(
                 student=student,
                 payer=payer,
                 relationship=relationship,
@@ -499,7 +537,7 @@ def remove_payer_from_student(request):
                 messages.error(request, 'Cannot remove the last payer from a student')
                 return redirect('students')
             
-            Studentpayer.objects.filter(student=student, payer=payer).delete()
+            StudentPayer.objects.filter(student=student, payer=payer).delete()
             messages.success(request, f'Removed {payer.get_full_name()} from {student}')
         except Exception as e:
             messages.error(request, f'Error removing payer: {str(e)}')
@@ -560,7 +598,7 @@ def payer_dashboard(request):
         return redirect('payer_login')
     
     # Get students already associated with this payer
-    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
+    my_students = Student.objects.filter(StudentPayer__payer=request.user).distinct()
 
     # Get current month and year
     current_date = timezone.now()
@@ -620,16 +658,16 @@ def add_student_to_payer(request):
             student = get_object_or_404(Student, id=student_id)
             
             # Check if the student is already linked to this payer
-            if Studentpayer.objects.filter(student=student, payer=request.user).exists():
+            if StudentPayer.objects.filter(student=student, payer=request.user).exists():
                 messages.warning(request, f'{student.first_name} {student.last_name} is already linked to your account.')
                 return redirect('payer_dashboard')
 
             # If this is set as primary, unset any existing primary payer
             if is_primary:
-                Studentpayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
+                StudentPayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
             
             # Create the payer-student relationship
-            Studentpayer.objects.create(
+            StudentPayer.objects.create(
                 student=student,
                 payer=request.user,
                 relationship=relationship,
@@ -753,7 +791,7 @@ def ask_question_view(request):
         return redirect('payer_login')
 
     # Get only the logged-in payer's students
-    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
+    my_students = Student.objects.filter(StudentPayer__payer=request.user).distinct()
     student_choices = [(s.id, f"{s.first_name} {s.last_name} (Balance: ${s.current_balance:.2f} | Due: {s.due_date.strftime('%b %d, %Y') if s.due_date else 'No due date'})") for s in my_students]
 
     if request.method == 'POST':
@@ -830,3 +868,28 @@ def add_bank_account(request):
     else:
         form = BankAccountForm()
     return render(request, 'add_bank_account.html', {'form': form})
+
+@login_required
+def add_payment_method(request):
+    if request.method == 'POST':
+        nickname = request.POST.get('nickname')
+        account_type = request.POST.get('account_type')
+        routing_number = request.POST.get('routing_number')
+        account_number = request.POST.get('account_number')
+        
+        try:
+            # Create bank account
+            bank_account = BankAccount.objects.create(
+                user=request.user,
+                nickname=nickname,
+                account_type=account_type,
+                last4=account_number[-4:],
+                provider_token='dummy_token'  # Replace with actual token from payment processor
+            )
+            
+            messages.success(request, 'Payment method added successfully.')
+            return redirect('payer_dashboard')
+        except Exception as e:
+            messages.error(request, f'Error adding payment method: {str(e)}')
+    
+    return render(request, 'tuition/add_payment_method.html')

@@ -1,11 +1,11 @@
 from django.contrib import admin
 from .models import (
-    Student, Studentpayer, Payment, PaymentReceipt, PaymentReminder,
+    Student, StudentPayer, Payment, PaymentReceipt, PaymentReminder,
     PaymentPlan, PaymentInstallment, AccountRequest, Vendor
 )
 
-class StudentpayerInline(admin.TabularInline):
-    model = Studentpayer
+class StudentPayerInline(admin.TabularInline):
+    model = StudentPayer
     extra = 1
 
 @admin.register(Student)
@@ -15,10 +15,10 @@ class StudentAdmin(admin.ModelAdmin):
     list_filter = ('status', 'grade', 'due_date')
     ordering = ('last_name',)
     filter_horizontal = ('payers',)
-    inlines = [StudentpayerInline] 
+    inlines = [StudentPayerInline] 
 
-@admin.register(Studentpayer)
-class StudentpayerAdmin(admin.ModelAdmin):
+@admin.register(StudentPayer)
+class StudentPayerAdmin(admin.ModelAdmin):
     list_display = ('student', 'payer', 'relationship')
     list_filter = ('relationship',)
     search_fields = ('student__first_name', 'payer__username')
