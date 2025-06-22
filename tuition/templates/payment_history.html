@@ -16,6 +16,7 @@
                             <thead class="bg-light">
                                 <tr>
                                     <th class="border-0">Date</th>
+                                    <th class="border-0">Student</th>
                                     <th class="border-0">Amount</th>
                                     <th class="border-0">Status</th>
                                     <th class="border-0 text-end">Actions</th>
@@ -24,11 +25,12 @@
                             <tbody>
                                 {% for payment in payments %}
                                 <tr>
-                                    <td>{{ payment.date }}</td>
+                                    <td>{{ payment.payment_date|date:"M d, Y H:i" }}</td>
+                                    <td>{{ payment.student.first_name }} {{ payment.student.last_name }}</td>
                                     <td>${{ payment.amount|floatformat:2 }}</td>
                                     <td>
-                                        <span class="badge {% if payment.status == 'Completed' %}bg-success{% else %}bg-warning{% endif %}">
-                                            {{ payment.status }}
+                                        <span class="badge {% if payment.status|lower == 'completed' or payment.status|lower == 'succeeded' %}bg-success{% elif payment.status|lower == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ payment.status|capfirst }}
                                         </span>
                                     </td>
                                     <td class="text-end">
@@ -39,7 +41,7 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center py-4">
+                                    <td colspan="5" class="text-center py-4">
                                         <div class="text-muted">
                                             <i class="fas fa-receipt fa-2x mb-3"></i>
                                             <p class="mb-0">No payment history available</p>

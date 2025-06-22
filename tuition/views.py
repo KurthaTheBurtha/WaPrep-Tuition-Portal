@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown
+from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card
 import random
 import string
 from django.core.mail import send_mail
@@ -22,8 +22,12 @@ from .bill_api import (
     create_bill,
     pay_bill
 )
+import stripe
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
-
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Create your views here.
 
@@ -100,35 +104,43 @@ def logout_view(request):
 @login_required
 def payment(request, student_id):
     student = get_object_or_404(Student, id=student_id)
-    
-    # Get current month and year
     now = timezone.now()
     current_month = now.month
     current_year = now.year
-    
-    # Get only current month's payment breakdown items
     breakdown_items = PaymentBreakdown.objects.filter(
         student=student,
         is_paid=False,
         due_date__year=current_year,
         due_date__month=current_month
     ).order_by('due_date')
-    
-    # Calculate total amount due for current month
     total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Get user's saved bank accounts
-    bank_accounts = BankAccount.objects.filter(user=request.user)
-    
+    # Stripe integration
+    stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
+    customer_id = get_or_create_stripe_customer(request.user)
+    # Create a PaymentIntent for the amount due (convert to cents)
+    if total_amount_due > 0:
+        payment_intent = stripe.PaymentIntent.create(
+            amount=int(total_amount_due * 100),
+            currency='usd',
+            customer=customer_id,
+            setup_future_usage='off_session',
+            metadata={
+                'student_id': student_id,
+                'user_id': request.user.id
+            }
+        )
+        client_secret = payment_intent.client_secret
+    else:
+        client_secret = None
     context = {
         'student_name': f"{student.first_name} {student.last_name}",
         'total_amount_due': total_amount_due,
         'breakdown_items': breakdown_items,
-        'bank_accounts': bank_accounts,
         'student_id': student_id,
-        'current_month': now.strftime('%B %Y')  # e.g., "March 2024"
+        'current_month': now.strftime('%B %Y'),
+        'STRIPE_PUBLISHABLE_KEY': stripe_publishable_key,
+        'STRIPE_CLIENT_SECRET': client_secret,
     }
-    
     return render(request, 'payment.html', context)
 
 @login_required
@@ -137,62 +149,45 @@ def process_payment(request):
         student_id = request.POST.get('student_id')
         student = get_object_or_404(Student, id=student_id)
         amount = request.POST.get('amount')
-        payment_method = request.POST.get('payment_method')
-        
+        payment_intent_id = request.POST.get('payment_intent_id')
         try:
-            # Get BILL session
-            session_id = get_session_id()
-            
-            if payment_method == 'new':
-                # Use new bank account details
-                name = request.POST.get('account_holder')
-                routing_number = request.POST.get('routing_number')
-                account_number = request.POST.get('account_number')
-                account_type = request.POST.get('account_type')
-                
-                # Save new bank account if user is a payer
-                if request.user.user_type == 'payer':
-                    bank_account = BankAccount.objects.create(
-                        user=request.user,
-                        nickname=f"{name}'s {account_type.capitalize()}",
-                        account_type=account_type,
-                        last4=account_number[-4:],
-                        provider_token=f"{routing_number}_{account_number}"
-                    )
-            else:
-                # Use existing bank account
-                bank_account = BankAccount.objects.get(id=payment_method, user=request.user)
-                name = request.user.get_full_name()
-                token_parts = bank_account.provider_token.split('_')
-                routing_number = token_parts[0]
-                account_number = token_parts[1]
-                account_type = bank_account.account_type
-            
-            # Create vendor in BILL
-            vendor_data = {
-                "name": name,
-                "email": request.user.email,
-                "accountType": "PERSON",
-                "phone": request.user.phone_number if hasattr(request.user, 'phone_number') else None,
-                "address": {
-                    "line1": request.user.address if hasattr(request.user, 'address') else None,
-                    "city": "Seattle",  # Default to Seattle
-                    "zipOrPostalCode": "98101",  # Default ZIP
-                    "country": "US"
-                }
-            }
-            vendor_response = create_vendor(session_id, vendor_data)
-            vendor_id = vendor_response['id']
-            
-            # Create bank account in BILL
-            bank_data = {
-                "bankAccountNumber": account_number,
-                "routingNumber": routing_number,
-                "accountType": account_type.upper(),
-                "bankAccountName": name
-            }
-            bank_response = create_bank_account(session_id, vendor_id, bank_data)
-            
+            # Retrieve the PaymentIntent from Stripe
+            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            if payment_intent.status not in ['succeeded', 'processing', 'requires_capture']:
+                messages.error(request, f"Payment failed or incomplete. Status: {payment_intent.status}")
+                return redirect('payment', student_id=student_id)
+            # Get payment method details
+            pm = stripe.PaymentMethod.retrieve(payment_intent.payment_method)
+            # Save payment record
+            from .models import Card, BankAccount
+            bank_account = None
+            card = None
+            payment_method_type = pm.type
+            if payment_method_type == 'card':
+                card_obj, _ = Card.objects.get_or_create(
+                    user=request.user,
+                    stripe_payment_method_id=pm.id,
+                    defaults={
+                        'nickname': f"{pm.card.brand.title()} ****{pm.card.last4}",
+                        'last4': pm.card.last4,
+                        'brand': pm.card.brand.title(),
+                        'exp_month': pm.card.exp_month,
+                        'exp_year': pm.card.exp_year,
+                    }
+                )
+                card = card_obj
+            elif payment_method_type == 'us_bank_account':
+                bank_obj, _ = BankAccount.objects.get_or_create(
+                    user=request.user,
+                    stripe_payment_method_id=pm.id,
+                    defaults={
+                        'nickname': f"Bank ****{pm.us_bank_account.last4}",
+                        'account_type': pm.us_bank_account.account_type,
+                        'last4': pm.us_bank_account.last4,
+                        'provider_token': '',
+                    }
+                )
+                bank_account = bank_obj
             # Get current month's payment items
             now = timezone.now()
             current_month = now.month
@@ -203,51 +198,21 @@ def process_payment(request):
                 due_date__year=current_year,
                 due_date__month=current_month
             )
-            
-            # Create line items for the bill
-            line_items = []
-            for item in payment_items:
-                line_items.append({
-                    "amount": str(item.amount),
-                    "description": item.description
-                })
-            
-            # Create bill in BILL
-            bill_data = {
-                "amount": str(amount),
-                "description": f"Tuition payment for {student.first_name} {student.last_name}",
-                "invoiceNumber": f"INV-{student.id}-{now.strftime('%Y%m%d')}",
-                "dueDate": now.strftime('%Y-%m-%d'),
-                "lineItems": line_items
-            }
-            bill_response = create_bill(session_id, vendor_id, bill_data)
-            bill_id = bill_response['id']
-            
-            # Process payment
-            payment_response = pay_bill(session_id, bill_id)
-            
             # Create payment record
             payment = Payment.objects.create(
                 student=student,
                 amount=amount,
-                status='pending',
-                bank_account=bank_account if 'bank_account' in locals() else None,
-                routing_number=routing_number,
-                account_number=account_number,
-                account_type=account_type,
-                receipt_number=payment_response.get('id', '')
+                status='completed' if payment_intent.status == 'succeeded' else 'pending',
+                bank_account=bank_account,
+                receipt_number=payment_intent.id
             )
-            
             # Mark payment items as paid
             payment_items.update(is_paid=True)
-            
             messages.success(request, f"✅ Payment of ${amount} submitted successfully. A receipt will be available once the payment is processed.")
             return redirect('payment_history')
-            
         except Exception as e:
             messages.error(request, f"Payment failed: {str(e)}")
             return redirect('payment', student_id=student_id)
-    
     return redirect('payment_history')
 
 @login_required
@@ -256,22 +221,10 @@ def payment_history(request):
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('admin_login')
-        
-    # In a real application, this would come from a database
-    payments = [
-        {
-            'id': 1,
-            'date': 'Feb 15, 2024',
-            'amount': 500.00,
-            'status': 'Completed'
-        },
-        {
-            'id': 2,
-            'date': 'Jan 15, 2024',
-            'amount': 500.00,
-            'status': 'Completed'
-        }
-    ]
+    # Get all students for this payer
+    students = Student.objects.filter(studentpayer__payer=request.user)
+    # Get all payments for these students
+    payments = Payment.objects.filter(student__in=students).order_by('-payment_date')
     return render(request, 'payment_history.html', {'payments': payments})
 
 @login_required
@@ -280,12 +233,41 @@ def download_receipt(request, payment_id):
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('admin_login')
-        
-    # In a real application, you would:
-    # 1. Fetch the payment details from the database
-    # 2. Generate a PDF receipt
-    # 3. Return the PDF file
-    return HttpResponse("Receipt download functionality will be implemented here")
+    payment = get_object_or_404(Payment, id=payment_id)
+    # Check that the user is allowed to access this payment
+    if not Student.objects.filter(id=payment.student.id, studentpayer__payer=request.user).exists():
+        messages.error(request, 'You do not have permission to access this receipt.')
+        return redirect('payment_history')
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 50
+    # Header
+    p.setFont('Helvetica-Bold', 18)
+    p.drawString(50, y, 'Waprep Tuition Payment Receipt')
+    y -= 30
+    p.setFont('Helvetica', 12)
+    p.drawString(50, y, f'Receipt #: {payment.receipt_number}')
+    y -= 20
+    p.drawString(50, y, f'Date: {payment.payment_date.strftime("%B %d, %Y %I:%M %p")}')
+    y -= 20
+    p.drawString(50, y, f'Payer: {request.user.get_full_name()} ({request.user.email})')
+    y -= 20
+    p.drawString(50, y, f'Student: {payment.student.first_name} {payment.student.last_name}')
+    y -= 20
+    p.drawString(50, y, f'Amount: ${payment.amount:.2f}')
+    y -= 20
+    p.drawString(50, y, f'Status: {payment.status.capitalize()}')
+    y -= 30
+    # Footer
+    p.setFont('Helvetica-Oblique', 10)
+    p.drawString(50, y, 'Thank you for your payment!')
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
+    return response
 
 @login_required
 def admin_dashboard(request):
@@ -598,12 +580,13 @@ def payer_dashboard(request):
         return redirect('payer_login')
     
     # Get students already associated with this payer
-    my_students = Student.objects.filter(StudentPayer__payer=request.user).distinct()
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
 
     # Get current month and year
     current_date = timezone.now()
     current_month = current_date.month
     current_year = current_date.year
+    today = current_date.date()
 
     # Calculate total amount owed and get payment breakdowns
     total_amount_owed = 0
@@ -612,24 +595,27 @@ def payer_dashboard(request):
     for student in my_students:
         # Get all unpaid payment breakdown items
         breakdown_items = student.payment_breakdowns.filter(is_paid=False)
-        
         # Get current month's items
         current_month_items = breakdown_items.filter(
             due_date__month=current_month,
             due_date__year=current_year
         )
-        
-        # Calculate totals
-        student_total = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
+        # Get overdue items
+        overdue_items = breakdown_items.filter(due_date__lt=today)
+        student.overdue_items = overdue_items
+        # Calculate tuition/boarding total (case-insensitive search)
+        tuition_boarding_items = breakdown_items.filter(
+            models.Q(description__icontains='tuition') | models.Q(description__icontains='boarding')
+        )
+        tuition_boarding_total = tuition_boarding_items.aggregate(total=Sum('amount'))['total'] or 0
+        student.total_due = tuition_boarding_total
+        # Calculate other totals
         student_month_total = current_month_items.aggregate(total=Sum('amount'))['total'] or 0
-        
-        total_amount_owed += student_total
+        total_amount_owed += tuition_boarding_total
         current_month_total += student_month_total
-        
         # Add breakdown items to student object for template access
         student.breakdown_items = breakdown_items
         student.current_month_items = current_month_items
-        student.total_due = student_total
         student.monthly_due = student_month_total
     
     context = {
@@ -871,25 +857,71 @@ def add_bank_account(request):
 
 @login_required
 def add_payment_method(request):
+    stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
+    # Get or create Stripe customer
+    customer_id = get_or_create_stripe_customer(request.user)
+    # Create a SetupIntent for this customer
+    setup_intent = stripe.SetupIntent.create(customer=customer_id)
+    client_secret = setup_intent.client_secret
+    print('DEBUG STRIPE_PUBLISHABLE_KEY:', stripe_publishable_key)
+    print('DEBUG STRIPE_CLIENT_SECRET:', client_secret)
     if request.method == 'POST':
+        payment_method_id = request.POST.get('payment_method_id')
         nickname = request.POST.get('nickname')
-        account_type = request.POST.get('account_type')
-        routing_number = request.POST.get('routing_number')
-        account_number = request.POST.get('account_number')
-        
         try:
-            # Create bank account
-            bank_account = BankAccount.objects.create(
-                user=request.user,
-                nickname=nickname,
-                account_type=account_type,
-                last4=account_number[-4:],
-                provider_token='dummy_token'  # Replace with actual token from payment processor
-            )
-            
-            messages.success(request, 'Payment method added successfully.')
+            # Retrieve the PaymentMethod from Stripe
+            pm = stripe.PaymentMethod.retrieve(payment_method_id)
+            # Attach to customer (if not already attached)
+            if not pm.customer:
+                stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+            # Save to Card or BankAccount model
+            if pm.type == 'card':
+                card = pm.card
+                brand = card.brand.title()
+                last4 = card.last4
+                exp_month = card.exp_month
+                exp_year = card.exp_year
+                Card.objects.create(
+                    user=request.user,
+                    nickname=nickname or f'{brand} ****{last4}',
+                    last4=last4,
+                    brand=brand,
+                    exp_month=exp_month,
+                    exp_year=exp_year,
+                    stripe_payment_method_id=payment_method_id
+                )
+                messages.success(request, 'Card added successfully.')
+            elif pm.type == 'us_bank_account':
+                bank = pm.us_bank_account
+                last4 = bank.last4
+                account_type = bank.account_type
+                BankAccount.objects.create(
+                    user=request.user,
+                    nickname=nickname or f'Bank ****{last4}',
+                    account_type=account_type,
+                    last4=last4,
+                    provider_token='',  # Not used with Stripe
+                    stripe_payment_method_id=payment_method_id
+                )
+                messages.success(request, 'Bank account added successfully.')
+            else:
+                messages.error(request, f'Unsupported payment method type: {pm.type}')
             return redirect('payer_dashboard')
         except Exception as e:
             messages.error(request, f'Error adding payment method: {str(e)}')
-    
-    return render(request, 'tuition/add_payment_method.html')
+    return render(request, 'add_payment_method.html', {
+        'STRIPE_PUBLISHABLE_KEY': stripe_publishable_key,
+        'STRIPE_CLIENT_SECRET': client_secret,
+    })
+
+def get_or_create_stripe_customer(user):
+    if user.stripe_customer_id:
+        return user.stripe_customer_id
+    # Create customer in Stripe
+    customer = stripe.Customer.create(
+        email=user.email,
+        name=user.get_full_name() or user.username
+    )
+    user.stripe_customer_id = customer.id
+    user.save(update_fields=["stripe_customer_id"])
+    return customer.id

@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
+from django.conf import settings
 
 class User(AbstractUser):
     USER_TYPE_CHOICES = (
@@ -15,6 +16,7 @@ class User(AbstractUser):
     address = models.TextField(blank=True)
     contact_info = models.TextField(blank=True)
     user_id = models.CharField(max_length=30, unique=True, null=True, blank=False)
+    stripe_customer_id = models.CharField(max_length=64, blank=True, null=True)
      
     def is_admin(self):
         return self.user_type == 'admin'
@@ -163,6 +165,7 @@ class BankAccount(models.Model):
     last4 = models.CharField(max_length=4)  # Only store last 4 digits
     provider_token = models.CharField(max_length=255)  # Token from payment provider
     created_at = models.DateTimeField(auto_now_add=True)
+    stripe_payment_method_id = models.CharField(max_length=64, blank=True, null=True)
 
     def __str__(self):
         return f"{self.nickname} (...{self.last4})"
@@ -181,3 +184,16 @@ class PaymentBreakdown(models.Model):
 
     class Meta:
         ordering = ['due_date', 'created_at']
+
+class Card(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cards')
+    nickname = models.CharField(max_length=100)
+    last4 = models.CharField(max_length=4)
+    brand = models.CharField(max_length=20)
+    exp_month = models.PositiveSmallIntegerField()
+    exp_year = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    stripe_payment_method_id = models.CharField(max_length=64, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.nickname} ({self.brand} ****{self.last4})"

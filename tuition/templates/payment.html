@@ -61,58 +61,20 @@
                         </div>
                     </div>
 
-                    {% if breakdown_items %}
+                    {% if breakdown_items and STRIPE_CLIENT_SECRET %}
                     <div class="mt-4">
-                        <form method="post" action="{% url 'process_payment' %}">
+                        <form id="stripe-payment-form" method="post" action="{% url 'process_payment' %}">
                             {% csrf_token %}
                             <input type="hidden" name="student_id" value="{{ student_id }}">
                             <input type="hidden" name="amount" value="{{ total_amount_due }}">
-                            
+                            <input type="hidden" name="payment_intent_id" id="payment_intent_id">
                             <div class="mb-3">
-                                <label for="payment_method" class="form-label">Select Payment Method</label>
-                                <select class="form-select" id="payment_method" name="payment_method" required>
-                                    <option value="">Choose a payment method...</option>
-                                    {% if bank_accounts %}
-                                        {% for account in bank_accounts %}
-                                            <option value="{{ account.id }}">
-                                                {{ account.nickname }} ({{ account.account_type|title }} - ****{{ account.last4 }})
-                                            </option>
-                                        {% endfor %}
-                                    {% endif %}
-                                    <option value="new">+ Add New Payment Method</option>
-                                </select>
+                                <label class="form-label">Payment Details</label>
+                                <div id="payment-element" class="form-control"></div>
                             </div>
-
-                            <div id="new_payment_method" class="d-none">
-                                <div class="card mb-3">
-                                    <div class="card-body">
-                                        <h6 class="card-title">New Payment Method</h6>
-                                        <div class="mb-3">
-                                            <label for="account_holder" class="form-label">Account Holder Name</label>
-                                            <input type="text" class="form-control" id="account_holder" name="account_holder">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="account_type" class="form-label">Account Type</label>
-                                            <select class="form-select" id="account_type" name="account_type">
-                                                <option value="checking">Checking</option>
-                                                <option value="savings">Savings</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="routing_number" class="form-label">Routing Number</label>
-                                            <input type="text" class="form-control" id="routing_number" name="routing_number" pattern="[0-9]{9}" maxlength="9">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="account_number" class="form-label">Account Number</label>
-                                            <input type="text" class="form-control" id="account_number" name="account_number">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    Proceed to Payment
+                                <button type="submit" class="btn btn-primary" id="submit-btn">
+                                    Pay Now
                                 </button>
                             </div>
                         </form>
@@ -126,21 +88,37 @@
 
 {% block extra_js %}
 <script>
-document.getElementById('payment_method').addEventListener('change', function() {
-    const newPaymentMethod = document.getElementById('new_payment_method');
-    if (this.value === 'new') {
-        newPaymentMethod.classList.remove('d-none');
-        // Make new payment method fields required
-        document.getElementById('account_holder').required = true;
-        document.getElementById('routing_number').required = true;
-        document.getElementById('account_number').required = true;
-    } else {
-        newPaymentMethod.classList.add('d-none');
-        // Make new payment method fields not required
-        document.getElementById('account_holder').required = false;
-        document.getElementById('routing_number').required = false;
-        document.getElementById('account_number').required = false;
+const stripe = Stripe("{{ STRIPE_PUBLISHABLE_KEY|default:'' }}");
+const options = {
+    clientSecret: "{{ STRIPE_CLIENT_SECRET|default:'' }}"
+};
+let elements;
+
+async function initialize() {
+    elements = stripe.elements(options);
+    const paymentElement = elements.create('payment');
+    paymentElement.mount('#payment-element');
+}
+
+initialize();
+
+document.getElementById('stripe-payment-form')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    document.getElementById('submit-btn').disabled = true;
+    const {error, paymentIntent} = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+            return_url: window.location.href // Not used, but required by API
+        },
+        redirect: 'if_required'
+    });
+    if (error) {
+        alert(error.message);
+        document.getElementById('submit-btn').disabled = false;
+        return;
     }
+    document.getElementById('payment_intent_id').value = paymentIntent.id;
+    this.submit();
 });
 </script>
 {% endblock %}
