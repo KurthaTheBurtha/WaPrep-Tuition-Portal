@@ -54,10 +54,8 @@
                                 <tr>
                                     <th class="border-0 ps-4">Student Name</th>
                                     <th class="border-0">Status</th>
-                                    <th class="border-0">payer/Guardian(s)</th>
+                                    <th class="border-0">Payer(s)</th>
                                     <th class="border-0">Notes</th>
-                                    <th class="border-0">Amount Owed</th>
-                                    <th class="border-0">Due Date</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
@@ -66,9 +64,6 @@
                                 <tr class="clickable-row" data-href="{% url 'student_profile' student.id %}">
                                     <td class="ps-4">
                                         <div class="d-flex align-items-center">
-                                            <div class="avatar-circle bg-primary bg-opacity-10 text-primary me-3">
-                                                {{ student.first_name|first }}{{ student.last_name|first }}
-                                            </div>
                                             <div>
                                                 <h6 class="mb-0">{{ student.first_name }} {{ student.last_name }}</h6>
                                                 <small class="text-muted">ID: {{ student.student_id }}</small>
@@ -94,14 +89,6 @@
                                                         {% if student_payer.is_primary %}<span class="badge bg-primary bg-opacity-10 text-primary ms-1">Primary</span>{% endif %}
                                                     </small>
                                                 </div>
-                                                <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-2"
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#removepayerModal"
-                                                        data-student-id="{{ student.id }}"
-                                                        data-payer-id="{{ student_payer.payer.id }}"
-                                                        data-payer-name="{{ student_payer.payer.first_name }} {{ student_payer.payer.last_name }}">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
                                             </div>
                                             {% endfor %}
                                         </div>
@@ -128,9 +115,7 @@
                                             </button>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        $0.00
-                                    </td>
+                                   
                                     <td class="text-end pe-4">
                                         <button type="button" class="btn btn-sm btn-outline-primary me-2"
                                                 data-bs-toggle="modal" 

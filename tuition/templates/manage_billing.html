@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Manage Billing</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Add Bill for Student</h5>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add">
+                <div class="col-md-4">
+                    <label for="student_id" class="form-label">Student</label>
+                    <select class="form-select" name="student_id" id="student_id" required>
+                        <option value="">Select Student</option>
+                        {% for student in students %}
+                        <option value="{{ student.id }}">{{ student.first_name }} {{ student.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="description" class="form-label">Description</label>
+                    <input type="text" class="form-control" name="description" id="description" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="amount" class="form-label">Amount ($)</label>
+                    <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="due_date" class="form-label">Due Date</label>
+                    <input type="date" class="form-control" name="due_date" id="due_date" required>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Add Bill</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">All Bills</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bill in bills %}
+                        <tr>
+                            <td>{{ bill.student.first_name }} {{ bill.student.last_name }}</td>
+                            <td>{{ bill.description }}</td>
+                            <td>${{ bill.amount|floatformat:2 }}</td>
+                            <td>{{ bill.due_date|date:'M d, Y' }}</td>
+                            <td>
+                                {% if bill.is_paid %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Unpaid</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="remove">
+                                    <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove this bill?');">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No bills found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

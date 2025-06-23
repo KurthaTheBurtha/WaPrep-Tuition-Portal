@@ -26,6 +26,7 @@ import stripe
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from io import BytesIO
+from django.views.decorators.http import require_POST
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -925,3 +926,44 @@ def get_or_create_stripe_customer(user):
     user.stripe_customer_id = customer.id
     user.save(update_fields=["stripe_customer_id"])
     return customer.id
+
+@login_required
+def manage_billing(request):
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    students = Student.objects.all()
+    bills = PaymentBreakdown.objects.select_related('student').order_by('-due_date')
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            student_id = request.POST.get('student_id')
+            description = request.POST.get('description')
+            amount = request.POST.get('amount')
+            due_date = request.POST.get('due_date')
+            try:
+                student = Student.objects.get(id=student_id)
+                PaymentBreakdown.objects.create(
+                    student=student,
+                    description=description,
+                    amount=amount,
+                    due_date=due_date,
+                    is_paid=False
+                )
+                messages.success(request, 'Bill added successfully.')
+            except Exception as e:
+                messages.error(request, f'Error adding bill: {str(e)}')
+        elif action == 'remove':
+            bill_id = request.POST.get('bill_id')
+            try:
+                bill = PaymentBreakdown.objects.get(id=bill_id)
+                bill.delete()
+                messages.success(request, 'Bill removed successfully.')
+            except Exception as e:
+                messages.error(request, f'Error removing bill: {str(e)}')
+        return redirect('manage_billing')
+    context = {
+        'students': students,
+        'bills': bills,
+    }
+    return render(request, 'manage_billing.html', context)

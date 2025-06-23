@@ -257,17 +257,20 @@
                             <i class="fas fa-user me-1"></i> My Profile
                         </a>
                     </li>
-                    {% elif user.user_type == 'accountant' %}
+                    {% elif user.user_type == 'admin' %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}"
-                            href="{% url 'students' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'students' %}active{% endif %}" href="{% url 'students' %}">
                             <i class="fas fa-user-graduate me-1"></i> Manage Students
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'accountant_reports' %}active{% endif %}"
-                            href="{% url 'accountant_reports' %}">
-                            <i class="fas fa-chart-bar me-1"></i> Generate Reports
+                        <a class="nav-link {% if request.resolver_match.url_name == 'manage_billing' %}active{% endif %}" href="{% url 'manage_billing' %}">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Manage Billing
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'admin_reports' %}active{% endif %}" href="{% url 'admin_reports' %}">
+                            <i class="fas fa-chart-bar me-1"></i> Reports
                         </a>
                     </li>
                     {% endif %}

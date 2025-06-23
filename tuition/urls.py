@@ -35,5 +35,6 @@ urlpatterns = [
     path('payer/edit-profile/', views.edit_payer_profile, name='edit_payer_profile'),
     path('ask-question/', views.ask_question_view, name='ask_question'),
     path('add-bank-account/', views.add_bank_account, name='add_bank_account'),
-    path('add-payment-method/', views.add_payment_method, name='add_payment_method')
+    path('add-payment-method/', views.add_payment_method, name='add_payment_method'),
+    path('admin/manage-billing/', views.manage_billing, name='manage_billing'),
 ]  
