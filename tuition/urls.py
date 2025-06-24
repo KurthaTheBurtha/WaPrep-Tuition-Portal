@@ -36,5 +36,8 @@ urlpatterns = [
     path('ask-question/', views.ask_question_view, name='ask_question'),
     path('add-bank-account/', views.add_bank_account, name='add_bank_account'),
     path('add-payment-method/', views.add_payment_method, name='add_payment_method'),
-    path('admin/manage-billing/', views.manage_billing, name='manage_billing'),
+    path('manage-billing/', views.manage_billing, name='manage_billing'),
+    path('manage-billing/<int:student_id>/', views.student_bills, name='student_bills'),
+    path('send-activation-email/<int:student_payer_id>/', views.send_activation_email, name='send_activation_email'),
+    path('activate-account/<int:user_id>/<str:temp_password>/', views.activate_account, name='activate_account'),
 ]  

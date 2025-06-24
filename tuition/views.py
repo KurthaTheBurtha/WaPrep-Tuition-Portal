@@ -37,22 +37,23 @@ def home(request):
 
 def payer_login(request):
     if request.method == 'POST':
-        username = request.POST.get('username')
+        user_id = request.POST.get('username')
         password = request.POST.get('password')
         remember = request.POST.get('remember')
-
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None and user.user_type == 'payer':
+        try:
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            user = None
+        if user and user.check_password(password) and user.user_type == 'payer':
             login(request, user)
-
             if not remember:
                 request.session.set_expiry(0)  # Session expires when browser closes
-
+            # If using temp password, force password change
+            if user.check_password(password) and len(password) >= 16:  # temp passwords are long
+                request.session['force_password_change'] = True
             return redirect('payer_welcome')
         else:
-            messages.error(request, 'Invalid username or password for payer account.')
-
+            messages.error(request, 'Invalid User ID or password for payer account.')
     return render(request, 'payer_login.html', {'hide_nav_items': True})
 
 def payer_signup(request):
@@ -467,6 +468,12 @@ def update_student(request):
     
     return redirect('students')
 
+def generate_unique_user_id():
+    while True:
+        user_id = 'P' + ''.join(random.choices(string.digits, k=7))
+        if not User.objects.filter(user_id=user_id).exists():
+            return user_id
+
 @login_required
 def add_payer_to_student(request):
     # Only allow admin users
@@ -476,29 +483,164 @@ def add_payer_to_student(request):
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
-        payer_id = request.POST.get('payer_id')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
         relationship = request.POST.get('relationship')
         is_primary = request.POST.get('is_primary', False) == 'on'
         
         try:
             student = get_object_or_404(Student, id=student_id)
-            payer = get_object_or_404(User, id=payer_id)
+            
+            # Check if user already exists
+            if User.objects.filter(email=email).exists():
+                payer = User.objects.get(email=email)
+                if payer.user_type != 'payer':
+                    messages.error(request, f'User with email {email} exists but is not a payer.')
+                    return redirect('student_profile', student_id=student_id)
+            else:
+                # Create new user with temporary password
+                import secrets
+                temp_password = secrets.token_urlsafe(12)
+                user_id = generate_unique_user_id()
+                payer = User.objects.create_user(
+                    username=user_id,  # Set username to user_id for login
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email,
+                    password=temp_password,
+                    user_type='payer',
+                    user_id=user_id
+                )
+                # Send activation email
+                activation_url = request.build_absolute_uri(f'/activate-account/{payer.id}/{temp_password}/')
+                subject = 'Welcome to WaPrep Tuition Portal - Activate Your Account'
+                message = f"""
+Hello {first_name},
+
+Welcome to the Washington Preparatory School Tuition Portal!
+
+You have been added as a payer for {student.first_name} {student.last_name}.
+
+Your User ID: {user_id}
+Your Temporary Password: {temp_password}
+
+To activate your account, please click the following link:
+{activation_url}
+
+Use your User ID and temporary password to log in. You will be prompted to change your password and complete your profile (address and phone number required).
+
+If you have any questions, please contact us.
+
+Best regards,
+WaPrep Administration
+                """.strip()
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
             
             # If this is set as primary, unset any existing primary payer
             if is_primary:
                 StudentPayer.objects.filter(student=student, is_primary=True).update(is_primary=False)
             
-            StudentPayer.objects.create(
-                student=student,
-                payer=payer,
-                relationship=relationship,
-                is_primary=is_primary
-            )
-            messages.success(request, f'Added {payer.get_full_name()} as {relationship} for {student}')
+            # Check if relationship already exists
+            if StudentPayer.objects.filter(student=student, payer=payer).exists():
+                messages.warning(request, f'{payer.get_full_name()} is already linked to {student} as a {relationship}.')
+            else:
+                StudentPayer.objects.create(
+                    student=student,
+                    payer=payer,
+                    relationship=relationship,
+                    is_primary=is_primary
+                )
+                messages.success(request, f'Added {payer.get_full_name()} as {relationship} for {student}. Activation email sent to {email}.')
         except Exception as e:
             messages.error(request, f'Error adding payer: {str(e)}')
     
-    return redirect('students')
+    return redirect('student_profile', student_id=student_id)
+
+@login_required
+def send_activation_email(request, student_payer_id):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    try:
+        student_payer = get_object_or_404(StudentPayer, id=student_payer_id)
+        payer = student_payer.payer
+        student = student_payer.student
+        
+        # Generate new temporary password
+        import secrets
+        temp_password = secrets.token_urlsafe(12)
+        payer.set_password(temp_password)
+        payer.save()
+        
+        # Send activation email
+        activation_url = request.build_absolute_uri(f'/activate-account/{payer.id}/{temp_password}/')
+        subject = 'WaPrep Tuition Portal - Account Activation'
+        message = f"""
+Hello {payer.first_name},
+
+You have been added as a payer for {student.first_name} {student.last_name} at Washington Preparatory School.
+
+To activate your account, please click the following link:
+{activation_url}
+
+Your temporary password is: {temp_password}
+
+Please change your password after logging in.
+
+If you have any questions, please contact us.
+
+Best regards,
+WaPrep Administration
+        """.strip()
+        
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [payer.email],
+            fail_silently=False,
+        )
+        
+        messages.success(request, f'Activation email sent to {payer.email}.')
+    except Exception as e:
+        messages.error(request, f'Error sending activation email: {str(e)}')
+    
+    return redirect('student_profile', student_id=student_payer.student.id)
+
+def activate_account(request, user_id, temp_password):
+    try:
+        user = get_object_or_404(User, id=user_id)
+        if user.check_password(temp_password):
+            # Log the user in
+            login(request, user)
+            # Check if contact info is missing
+            missing_fields = []
+            if not user.phone_number:
+                missing_fields.append('phone number')
+            if not user.address:
+                missing_fields.append('address')
+            if not user.contact_info:
+                missing_fields.append('other contact information')
+            if missing_fields:
+                messages.warning(request, f"Account activated! Please complete your profile by adding your {', '.join(missing_fields)}.")
+            else:
+                messages.success(request, 'Account activated successfully!')
+            return redirect('payer_profile')
+        else:
+            messages.error(request, 'Invalid activation link.')
+            return redirect('payer_login')
+    except Exception as e:
+        messages.error(request, 'Error activating account.')
+        return redirect('payer_login')
 
 @login_required
 def remove_payer_from_student(request):
@@ -710,24 +852,43 @@ Please review and follow up accordingly.
 
 @login_required
 def payer_welcome(request):
+    # Only allow payer users
     if request.user.user_type != 'payer':
-        return redirect('admin_login')  # or show 403
+        return redirect('payer_login')
+    # Force password change if flagged
+    if request.session.get('force_password_change', False):
+        messages.warning(request, 'Please change your password and complete your profile (address and phone required) before continuing.')
+        return redirect('payer_profile')
     return render(request, 'payer_welcome.html')
 
 @login_required
 def payer_profile_view(request):
     if request.user.user_type != 'payer':
         return redirect('payer_dashboard')  # or return 403
-
+    # If forced, require password change and profile completion
+    force_change = request.session.get('force_password_change', False)
     if request.method == 'POST':
         form = PayerProfileForm(request.POST, instance=request.user)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            # If password is being changed, clear the force flag
+            new_password = request.POST.get('new_password')
+            if new_password:
+                user.set_password(new_password)
+                user.save()
+                request.session['force_password_change'] = False
+                messages.success(request, 'Password changed successfully!')
+                login(request, user)
+            # Check required fields
+            if user.phone_number and user.address:
+                request.session['force_password_change'] = False
+                messages.success(request, 'Profile updated successfully!')
+            else:
+                messages.warning(request, 'Please complete your address and phone number to continue.')
             return redirect('payer_profile')
     else:
         form = PayerProfileForm(instance=request.user)
-
-    return render(request, 'payer_profile.html', {'form': form})
+    return render(request, 'payer_profile.html', {'form': form, 'force_change': force_change})
 
 @login_required
 def edit_payer_profile(request):
@@ -933,16 +1094,33 @@ def manage_billing(request):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('home')
     students = Student.objects.all()
-    bills = PaymentBreakdown.objects.select_related('student').order_by('-due_date')
+    # Calculate total amount owed for each student
+    student_billing = []
+    for student in students:
+        total_owed = student.payment_breakdowns.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+        student_billing.append({
+            'student': student,
+            'total_owed': total_owed,
+        })
+    context = {
+        'student_billing': student_billing,
+    }
+    return render(request, 'manage_billing.html', context)
+
+@login_required
+def student_bills(request, student_id):
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    student = get_object_or_404(Student, id=student_id)
+    bills = student.payment_breakdowns.all().order_by('-due_date')
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add':
-            student_id = request.POST.get('student_id')
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
             try:
-                student = Student.objects.get(id=student_id)
                 PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
@@ -961,9 +1139,9 @@ def manage_billing(request):
                 messages.success(request, 'Bill removed successfully.')
             except Exception as e:
                 messages.error(request, f'Error removing bill: {str(e)}')
-        return redirect('manage_billing')
+        return redirect('student_bills', student_id=student.id)
     context = {
-        'students': students,
+        'student': student,
         'bills': bills,
     }
-    return render(request, 'manage_billing.html', context)
+    return render(request, 'student_bills.html', context)

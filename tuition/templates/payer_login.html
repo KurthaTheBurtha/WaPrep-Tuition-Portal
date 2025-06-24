@@ -24,11 +24,13 @@
                     <div class="mb-3">
                         <label for="user_id" class="form-label">User ID</label>
                         <input type="text" class="form-control" id="user_id" name="username" required>
+                        <div class="form-text">Use the User ID provided in your activation email. (Not your email address)</div>
                     </div>
                 
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">Use your temporary password if this is your first login.</div>
                     </div>
                 
                     <div class="mb-3 form-check">
@@ -46,7 +48,7 @@
                 </div>
 
                 <div class="text-center mt-3">
-                    <p class="mb-0">Don’t have an account yet? 
+                    <p class="mb-0">Don't have an account yet? 
                         <a href="{% url 'request_account' %}" class="text-decoration-none">Contact Administrator</a>
                     </p>
                 </div>    
@@ -55,6 +57,9 @@
                     <p class="mb-0">Are you an Administrator? <a href="{% url 'admin_login' %}" class="text-decoration-none">Login here</a></p>
                 </div>
                 
+                <div class="text-center mt-3">
+                    <p class="mb-0 text-muted">First time logging in? You will be prompted to change your password and complete your profile.</p>
+                </div>
                 
             </div>
         </div>
