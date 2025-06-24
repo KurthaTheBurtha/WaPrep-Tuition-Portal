@@ -1,16 +1,16 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card
+from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem
 import random
 import string
 from django.core.mail import send_mail
 from django.db import models
-from .forms import AccountRequestForm
+from .forms import AccountRequestForm, ProfileCompletionForm
 from django.conf import settings
 from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
 from django.db.models import Sum
@@ -105,7 +105,23 @@ def logout_view(request):
 
 @login_required
 def payment(request, student_id):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    # Check if user has completed their profile
+    if not request.user.phone_number or not request.user.address:
+        messages.warning(request, 'Please complete your profile before making payments.')
+        return redirect('profile_completion')
+    
     student = get_object_or_404(Student, id=student_id)
+    
+    # Check if the current user is authorized to pay for this student
+    if not StudentPayer.objects.filter(student=student, payer=request.user).exists():
+        messages.error(request, 'You are not authorized to make payments for this student.')
+        return redirect('payer_dashboard')
+    
     now = timezone.now()
     current_month = now.month
     current_year = now.year
@@ -134,6 +150,7 @@ def payment(request, student_id):
         client_secret = payment_intent.client_secret
     else:
         client_secret = None
+    
     context = {
         'student_name': f"{student.first_name} {student.last_name}",
         'total_amount_due': total_amount_due,
@@ -208,8 +225,35 @@ def process_payment(request):
                 bank_account=bank_account,
                 receipt_number=payment_intent.id
             )
-            # Mark payment items as paid
-            payment_items.update(is_paid=True)
+            
+            # Create PaymentItem records to link payment to breakdown items
+            total_payment_amount = float(amount)
+            payment_items_list = list(payment_items)
+            
+            if payment_items_list:
+                # Calculate how much each item should be paid
+                # For now, we'll distribute the payment proportionally across all items
+                total_items_amount = sum(item.amount for item in payment_items_list)
+                
+                for item in payment_items_list:
+                    if total_items_amount > 0:
+                        # Calculate proportional amount for this item
+                        item_amount = (item.amount / total_items_amount) * total_payment_amount
+                        # Round to 2 decimal places
+                        item_amount = round(item_amount, 2)
+                    else:
+                        item_amount = 0
+                    
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=item,
+                        amount_paid=item_amount
+                    )
+                
+                # Mark payment items as paid
+                payment_items.update(is_paid=True)
+            
             messages.success(request, f"✅ Payment of ${amount} submitted successfully. A receipt will be available once the payment is processed.")
             return redirect('payment_history')
         except Exception as e:
@@ -222,12 +266,37 @@ def payment_history(request):
     # Only allow payer users
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
-        return redirect('admin_login')
-    # Get all students for this payer
-    students = Student.objects.filter(studentpayer__payer=request.user)
-    # Get all payments for these students
-    payments = Payment.objects.filter(student__in=students).order_by('-payment_date')
-    return render(request, 'payment_history.html', {'payments': payments})
+        return redirect('payer_login')
+    
+    # Check if user has completed their profile
+    if not request.user.phone_number or not request.user.address:
+        messages.warning(request, 'Please complete your profile before viewing payment history.')
+        return redirect('profile_completion')
+    
+    # Get all students associated with this payer
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
+    
+    # Get payments made by this payer (through their bank accounts or direct payment info)
+    # First, get payments made through saved bank accounts
+    bank_account_payments = Payment.objects.filter(
+        bank_account__user=request.user
+    )
+    
+    # Also get payments where the payer might have used direct payment info
+    # This is a fallback for payments that don't have a bank_account reference
+    direct_payments = Payment.objects.filter(
+        student__in=my_students,
+        bank_account__isnull=True  # Only payments without bank account reference
+    )
+    
+    # Combine both querysets and order by payment date
+    payments = (bank_account_payments | direct_payments).distinct().order_by('-payment_date')
+    
+    context = {
+        'payments': payments,
+        'my_students': my_students,
+    }
+    return render(request, 'payment_history.html', context)
 
 @login_required
 def download_receipt(request, payment_id):
@@ -272,6 +341,42 @@ def download_receipt(request, payment_id):
     return response
 
 @login_required
+def payment_detail(request, payment_id):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    payment = get_object_or_404(Payment, id=payment_id)
+    
+    # Check that the user is allowed to access this payment
+    if not Student.objects.filter(id=payment.student.id, studentpayer__payer=request.user).exists():
+        messages.error(request, 'You do not have permission to access this payment.')
+        return redirect('payment_history')
+    
+    # Get payment items (breakdown of what was paid for)
+    payment_items = PaymentItem.objects.filter(payment=payment).select_related('breakdown_item')
+    
+    # If no payment items exist, create a fallback display
+    if not payment_items.exists():
+        # This might happen for older payments before PaymentItem was implemented
+        # Show a generic breakdown
+        payment_items = []
+        context = {
+            'payment': payment,
+            'payment_items': payment_items,
+            'has_breakdown': False,
+        }
+    else:
+        context = {
+            'payment': payment,
+            'payment_items': payment_items,
+            'has_breakdown': True,
+        }
+    
+    return render(request, 'payment_detail.html', context)
+
+@login_required
 def admin_dashboard(request):
     # Only accessible by admins
     if request.user.user_type != 'admin':
@@ -309,12 +414,43 @@ def students(request):
         messages.error(request, 'Only admins can access this page.')
         return redirect('admin_login')
     
+    # Get search parameters
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', 'first_name')
+    sort_order = request.GET.get('order', 'asc')
+    
+    # Start with all students
     students = Student.objects.all()
+    
+    # Apply search filter
+    if search_query:
+        students = students.filter(
+            models.Q(first_name__icontains=search_query) |
+            models.Q(last_name__icontains=search_query) |
+            models.Q(student_id__icontains=search_query) |
+            models.Q(grade__icontains=search_query)
+        )
+    
+    # Apply sorting
+    if sort_order == 'desc':
+        sort_by = f'-{sort_by}'
+    
+    # Handle special sorting cases
+    if sort_by in ['first_name', '-first_name']:
+        students = students.order_by(sort_by, 'last_name')
+    elif sort_by in ['last_name', '-last_name']:
+        students = students.order_by(sort_by, 'first_name')
+    else:
+        students = students.order_by(sort_by)
+    
     payers = User.objects.filter(user_type='payer')
     
     context = {
         'students': students,
         'payers': payers,
+        'search_query': search_query,
+        'sort_by': sort_by.replace('-', '') if sort_by.startswith('-') else sort_by,
+        'sort_order': sort_order,
     }
     return render(request, 'students.html', context)
 
@@ -468,11 +604,43 @@ def update_student(request):
     
     return redirect('students')
 
-def generate_unique_user_id():
+def generate_unique_user_id(first_name, last_name):
+    """
+    Generate a unique user ID based on first and last name.
+    Format: First letter of first name + first letter of last name + last 4 digits of last name + random 3 digits
+    Example: John Smith -> JSith123
+    """
+    # Clean and normalize names
+    first_name = first_name.strip().upper()
+    last_name = last_name.strip().upper()
+    
+    # Get first letter of first name
+    first_initial = first_name[0] if first_name else 'X'
+    
+    # Get first letter of last name
+    last_initial = last_name[0] if last_name else 'X'
+    
+    # Get last 4 characters of last name (or pad with X if shorter)
+    last_part = last_name[-4:] if len(last_name) >= 4 else last_name.ljust(4, 'X')
+    
+    # Generate base user ID
+    base_user_id = f"{first_initial}{last_initial}{last_part}"
+    
+    # Add random 3 digits to ensure uniqueness
+    counter = 1
     while True:
-        user_id = 'P' + ''.join(random.choices(string.digits, k=7))
+        if counter == 1:
+            user_id = base_user_id
+        else:
+            user_id = f"{base_user_id}{counter:03d}"
+        
         if not User.objects.filter(user_id=user_id).exists():
             return user_id
+        
+        counter += 1
+        if counter > 999:  # Prevent infinite loop
+            # Fallback to original random method
+            return 'P' + ''.join(random.choices(string.digits, k=7))
 
 @login_required
 def add_payer_to_student(request):
@@ -502,7 +670,7 @@ def add_payer_to_student(request):
                 # Create new user with temporary password
                 import secrets
                 temp_password = secrets.token_urlsafe(12)
-                user_id = generate_unique_user_id()
+                user_id = generate_unique_user_id(first_name, last_name)
                 payer = User.objects.create_user(
                     username=user_id,  # Set username to user_id for login
                     first_name=first_name,
@@ -528,7 +696,11 @@ Your Temporary Password: {temp_password}
 To activate your account, please click the following link:
 {activation_url}
 
-Use your User ID and temporary password to log in. You will be prompted to change your password and complete your profile (address and phone number required).
+After activation, you will be required to:
+1. Change your password
+2. Add your phone number (required)
+3. Add your address (required)
+4. Add any additional contact information (optional)
 
 If you have any questions, please contact us.
 
@@ -589,12 +761,17 @@ Hello {payer.first_name},
 
 You have been added as a payer for {student.first_name} {student.last_name} at Washington Preparatory School.
 
+Your User ID: {payer.user_id}
+Your Temporary Password: {temp_password}
+
 To activate your account, please click the following link:
 {activation_url}
 
-Your temporary password is: {temp_password}
-
-Please change your password after logging in.
+After activation, you will be required to:
+1. Change your password
+2. Add your phone number (required)
+3. Add your address (required)
+4. Add any additional contact information (optional)
 
 If you have any questions, please contact us.
 
@@ -622,19 +799,9 @@ def activate_account(request, user_id, temp_password):
         if user.check_password(temp_password):
             # Log the user in
             login(request, user)
-            # Check if contact info is missing
-            missing_fields = []
-            if not user.phone_number:
-                missing_fields.append('phone number')
-            if not user.address:
-                missing_fields.append('address')
-            if not user.contact_info:
-                missing_fields.append('other contact information')
-            if missing_fields:
-                messages.warning(request, f"Account activated! Please complete your profile by adding your {', '.join(missing_fields)}.")
-            else:
-                messages.success(request, 'Account activated successfully!')
-            return redirect('payer_profile')
+            # Redirect to profile completion
+            messages.success(request, 'Account activated successfully! Please complete your profile.')
+            return redirect('profile_completion')
         else:
             messages.error(request, 'Invalid activation link.')
             return redirect('payer_login')
@@ -721,6 +888,11 @@ def payer_dashboard(request):
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('payer_login')
+    
+    # Check if user has completed their profile (phone number and address are required)
+    if not request.user.phone_number or not request.user.address:
+        messages.warning(request, 'Please complete your profile before accessing the dashboard.')
+        return redirect('profile_completion')
     
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
@@ -1019,6 +1191,16 @@ def add_bank_account(request):
 
 @login_required
 def add_payment_method(request):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    # Check if user has completed their profile
+    if not request.user.phone_number or not request.user.address:
+        messages.warning(request, 'Please complete your profile before adding payment methods.')
+        return redirect('profile_completion')
+    
     stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
     # Get or create Stripe customer
     customer_id = get_or_create_stripe_customer(request.user)
@@ -1145,3 +1327,81 @@ def student_bills(request, student_id):
         'bills': bills,
     }
     return render(request, 'student_bills.html', context)
+
+@login_required
+def profile_completion(request):
+    if request.user.user_type != 'payer':
+        messages.error(request, 'Only payers can access this page.')
+        return redirect('payer_login')
+
+    if request.method == 'POST':
+        form = ProfileCompletionForm(request.POST, instance=request.user)
+        if form.is_valid():
+            user = form.save(commit=False)
+            
+            # Set the new password
+            new_password = form.cleaned_data.get('new_password1')
+            if new_password:
+                user.set_password(new_password)
+            
+            user.save()
+            
+            # Re-authenticate the user with the new password
+            login(request, user)
+            
+            messages.success(request, 'Profile completed successfully! You can now access your dashboard.')
+            return redirect('payer_dashboard')
+    else:
+        form = ProfileCompletionForm(instance=request.user)
+
+    return render(request, 'profile_completion.html', {'form': form})
+
+@login_required
+def inline_edit_student_field(request):
+    """Handle inline editing of student fields via AJAX"""
+    if request.user.user_type != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        field_name = request.POST.get('field_name')
+        field_value = request.POST.get('field_value')
+        
+        try:
+            student = get_object_or_404(Student, id=student_id)
+            
+            # Validate field name
+            allowed_fields = ['first_name', 'last_name', 'grade', 'status', 'notes', 'date_of_birth']
+            if field_name not in allowed_fields:
+                return JsonResponse({'error': 'Invalid field'}, status=400)
+            
+            # Set the field value
+            setattr(student, field_name, field_value)
+            student.save()
+            
+            # Return the formatted value for display
+            if field_name == 'status':
+                display_value = student.get_status_display()
+            elif field_name == 'grade':
+                display_value = f"Grade {field_value}"
+            elif field_name == 'notes':
+                display_value = field_value if field_value else "No notes added yet."
+            elif field_name == 'date_of_birth':
+                try:
+                    date_obj = datetime.strptime(field_value, '%Y-%m-%d').date()
+                    display_value = date_obj.strftime('%b %d, %Y')
+                except:
+                    display_value = field_value
+            else:
+                display_value = field_value
+                
+            return JsonResponse({
+                'success': True,
+                'display_value': display_value,
+                'message': f'{field_name.replace("_", " ").title()} updated successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)

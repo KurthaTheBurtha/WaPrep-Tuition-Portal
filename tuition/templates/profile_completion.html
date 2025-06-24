@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+            <div class="login-box mt-5">
+                <div class="text-center mb-4">
+                    <h2>Complete Your Profile</h2>
+                    <p class="text-muted">Please complete your profile to continue</p>
+                </div>
+
+                {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- Password Change Section -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Change Your Password</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.new_password1.id_for_label }}" class="form-label">
+                                            {{ form.new_password1.label }}
+                                        </label>
+                                        <div class="input-group">
+                                            {{ form.new_password1 }}
+                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('{{ form.new_password1.id_for_label }}')">
+                                                <i class="fas fa-eye" id="eye-{{ form.new_password1.id_for_label }}"></i>
+                                            </button>
+                                        </div>
+                                        {% if form.new_password1.help_text %}
+                                            <div class="form-text">{{ form.new_password1.help_text }}</div>
+                                        {% endif %}
+                                        {% if form.new_password1.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.new_password1.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.new_password2.id_for_label }}" class="form-label">
+                                            {{ form.new_password2.label }}
+                                        </label>
+                                        <div class="input-group">
+                                            {{ form.new_password2 }}
+                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('{{ form.new_password2.id_for_label }}')">
+                                                <i class="fas fa-eye" id="eye-{{ form.new_password2.id_for_label }}"></i>
+                                            </button>
+                                        </div>
+                                        {% if form.new_password2.help_text %}
+                                            <div class="form-text">{{ form.new_password2.help_text }}</div>
+                                        {% endif %}
+                                        {% if form.new_password2.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.new_password2.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Information Section -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Contact Information</h5>
+                            <small class="text-muted">Phone number and address are required</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.phone_number.id_for_label }}" class="form-label">
+                                            {{ form.phone_number.label }} *
+                                        </label>
+                                        {{ form.phone_number }}
+                                        {% if form.phone_number.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.phone_number.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.contact_info.id_for_label }}" class="form-label">
+                                            {{ form.contact_info.label }}
+                                        </label>
+                                        {{ form.contact_info }}
+                                        {% if form.contact_info.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.contact_info.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-3">
+                                        <label for="{{ form.address.id_for_label }}" class="form-label">
+                                            {{ form.address.label }} *
+                                        </label>
+                                        {{ form.address }}
+                                        {% if form.address.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.address.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form-level errors -->
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Complete Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-box {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: none;
+    }
+
+    .card {
+        border: 1px solid #e3e6f0;
+        border-radius: 0.35rem;
+    }
+
+    .card-header {
+        background-color: #f8f9fc;
+        border-bottom: 1px solid #e3e6f0;
+        padding: 1rem 1.25rem;
+    }
+
+    .form-control {
+        padding: 0.75rem;
+        border-radius: 5px;
+        border: 1px solid #d1d3e2;
+    }
+
+    .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        border-color: #bac8f3;
+    }
+
+    .btn-primary {
+        padding: 0.75rem;
+        font-weight: 500;
+        background-color: #4e73df;
+        border-color: #4e73df;
+    }
+
+    .btn-primary:hover {
+        background-color: #2e59d9;
+        border-color: #2653d4;
+    }
+
+    .alert {
+        border-radius: 5px;
+        margin-bottom: 1rem;
+    }
+
+    .container-fluid {
+        background-color: transparent;
+        box-shadow: none;
+        padding: 0 2rem;
+    }
+
+    .text-danger {
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .form-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding: 0 1rem;
+        }
+        
+        .login-box {
+            padding: 1.5rem;
+        }
+    }
+
+    /* Input group styling */
+    .input-group .form-control {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .input-group .btn {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        border-left: none;
+    }
+
+    .input-group .btn:hover {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+    }
+</style>
+
+<script>
+function togglePassword(fieldId) {
+    const passwordField = document.getElementById(fieldId);
+    const eyeIcon = document.getElementById('eye-' + fieldId);
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        eyeIcon.classList.remove('fa-eye');
+        eyeIcon.classList.add('fa-eye-slash');
+    } else {
+        passwordField.type = 'password';
+        eyeIcon.classList.remove('fa-eye-slash');
+        eyeIcon.classList.add('fa-eye');
+    }
+}
+</script>
+{% endblock %} 

@@ -151,7 +151,7 @@ class AccountRequest(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} - Account Request"
+         return f"{self.first_name} {self.last_name} - Account Request"
     
 class Vendor(models.Model):
     name = models.CharField(max_length=255)
@@ -184,6 +184,18 @@ class PaymentBreakdown(models.Model):
 
     class Meta:
         ordering = ['due_date', 'created_at']
+
+class PaymentItem(models.Model):
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='payment_items')
+    breakdown_item = models.ForeignKey(PaymentBreakdown, on_delete=models.CASCADE, related_name='payment_items')
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.breakdown_item.description} - ${self.amount_paid}"
+
+    class Meta:
+        unique_together = ('payment', 'breakdown_item')
 
 class Card(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cards')

@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">Payment Details</h2>
+                <a href="{% url 'payment_history' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Payment History
+                </a>
+            </div>
+            
+            <!-- Payment Summary Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h3 class="h5 mb-0">Payment Summary</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Receipt Number:</strong>
+                                <span class="ms-2">{{ payment.receipt_number }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Date:</strong>
+                                <span class="ms-2">{{ payment.payment_date|date:"F d, Y \a\t g:i A" }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Student:</strong>
+                                <span class="ms-2">{{ payment.student.first_name }} {{ payment.student.last_name }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Total Amount:</strong>
+                                <span class="ms-2 text-success fw-bold">${{ payment.amount|floatformat:2 }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Status:</strong>
+                                <span class="ms-2 badge {% if payment.status|lower == 'completed' or payment.status|lower == 'succeeded' %}bg-success{% elif payment.status|lower == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ payment.status|capfirst }}
+                                </span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Payment Method:</strong>
+                                <span class="ms-2">
+                                    {% if payment.bank_account %}
+                                        {{ payment.bank_account.nickname }} (...{{ payment.bank_account.last4 }})
+                                    {% else %}
+                                        Bank Account
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Breakdown Card -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h3 class="h5 mb-0">Payment Breakdown</h3>
+                </div>
+                <div class="card-body p-0">
+                    {% if has_breakdown and payment_items %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="border-0">Item Description</th>
+                                        <th class="border-0">Due Date</th>
+                                        <th class="border-0 text-end">Amount Paid</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in payment_items %}
+                                    <tr>
+                                        <td>{{ item.breakdown_item.description }}</td>
+                                        <td>
+                                            {% if item.breakdown_item.due_date %}
+                                                {{ item.breakdown_item.due_date|date:"M d, Y" }}
+                                            {% else %}
+                                                <span class="text-muted">No due date</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">${{ item.amount_paid|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="bg-light">
+                                    <tr>
+                                        <td colspan="2" class="text-end fw-bold">Total:</td>
+                                        <td class="text-end fw-bold">${{ payment.amount|floatformat:2 }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                                <p class="mb-0">Detailed breakdown not available for this payment.</p>
+                                <small class="text-muted">This payment was processed before detailed breakdowns were implemented.</small>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-4 text-center">
+                <a href="{% url 'download_receipt' payment.id %}" class="btn btn-primary me-2">
+                    <i class="fas fa-download me-2"></i>Download Receipt
+                </a>
+                <a href="{% url 'payment_history' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-list me-2"></i>View All Payments
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: 0.5rem;
+    }
+    
+    .card-header {
+        border-bottom: 1px solid rgba(0,0,0,.125);
+        padding: 1rem;
+    }
+    
+    .table th {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .table td {
+        vertical-align: middle;
+    }
+    
+    .badge {
+        padding: 0.5em 0.75em;
+        font-weight: 500;
+    }
+    
+    .table-responsive {
+        border-radius: 0.5rem;
+    }
+    
+    .table tfoot {
+        border-top: 2px solid #dee2e6;
+    }
+    
+    .text-success {
+        color: #198754 !important;
+    }
+</style>
+{% endblock %} 

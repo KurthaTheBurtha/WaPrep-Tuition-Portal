@@ -24,26 +24,54 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-4">
                         <div>
-                            <h2 class="mb-0">{{ student.first_name }} {{ student.last_name }}</h2>
+                            <div class="d-flex align-items-center">
+                                <h2 class="mb-0 me-2" id="name-display">{{ student.first_name }} {{ student.last_name }}</h2>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editName('{{ student.first_name }}', '{{ student.last_name }}')" title="Edit name">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
                             <small class="text-muted">Student ID: {{ student.student_id }}</small>
                         </div>
                     </div>
 
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
-                            <p><strong>Grade:</strong> Grade {{ student.grade }}</p>
-                            <p><strong>Date of Birth:</strong> {{ student.date_of_birth|date:"M d, Y" }}</p>
-                            <p>
-                                <strong>Status:</strong>
-                                <span
-                                    class="badge {% if student.status == 'active' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 {% if student.status == 'active' %}text-success{% else %}text-danger{% endif %}">
-                                    {{ student.get_status_display }}
+                            <div class="d-flex align-items-center mb-3">
+                                <p class="mb-0 me-2"><strong>Grade:</strong></p>
+                                <span id="grade-display">Grade {{ student.grade }}</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editField('grade', '{{ student.grade }}')" title="Edit grade">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="d-flex align-items-center mb-3">
+                                <p class="mb-0 me-2"><strong>Date of Birth:</strong></p>
+                                <span id="dob-display">{{ student.date_of_birth|date:"M d, Y" }}</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editField('date_of_birth', '{{ student.date_of_birth|date:"Y-m-d" }}')" title="Edit date of birth">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="d-flex align-items-center mb-3">
+                                <p class="mb-0 me-2"><strong>Status:</strong></p>
+                                <span id="status-display">
+                                    <span class="badge {% if student.status == 'active' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 {% if student.status == 'active' %}text-success{% else %}text-danger{% endif %}">
+                                        {{ student.get_status_display }}
+                                    </span>
                                 </span>
-                            </p>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editField('status', '{{ student.status }}')" title="Edit status">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Notes:</strong></p>
-                            <div class="bg-light p-3 rounded text-muted">
+                            <div class="d-flex align-items-start mb-3">
+                                <p class="mb-0 me-2"><strong>Notes:</strong></p>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editField('notes', '{{ student.notes|default:""|escapejs }}')" title="Edit notes">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                            <div id="notes-display" class="bg-light p-3 rounded text-muted">
                                 {{ student.notes|default:"No notes added yet." }}
                             </div>
                         </div>
@@ -169,8 +197,291 @@ function toggleNewPayerFields() {
         document.getElementById('email').required = true;
     }
 }
+
+function editField(fieldName, currentValue) {
+    let displayElement, inputElement, saveButton, cancelButton;
+    
+    if (fieldName === 'grade') {
+        displayElement = document.getElementById('grade-display');
+        inputElement = document.createElement('select');
+        inputElement.className = 'form-select form-select-sm';
+        inputElement.style.width = '100px';
+        
+        const grades = ['6', '7', '8', '9', '10', '11', '12'];
+        grades.forEach(grade => {
+            const option = document.createElement('option');
+            option.value = grade;
+            option.textContent = `Grade ${grade}`;
+            if (grade === currentValue) option.selected = true;
+            inputElement.appendChild(option);
+        });
+    } else if (fieldName === 'status') {
+        displayElement = document.getElementById('status-display');
+        inputElement = document.createElement('select');
+        inputElement.className = 'form-select form-select-sm';
+        inputElement.style.width = '100px';
+        
+        const statuses = [
+            {value: 'active', text: 'Active'},
+            {value: 'inactive', text: 'Inactive'}
+        ];
+        statuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status.value;
+            option.textContent = status.text;
+            if (status.value === currentValue) option.selected = true;
+            inputElement.appendChild(option);
+        });
+    } else if (fieldName === 'notes') {
+        displayElement = document.getElementById('notes-display');
+        inputElement = document.createElement('textarea');
+        inputElement.className = 'form-control';
+        inputElement.rows = 3;
+        inputElement.value = currentValue;
+    } else if (fieldName === 'date_of_birth') {
+        displayElement = document.getElementById('dob-display');
+        inputElement = document.createElement('input');
+        inputElement.type = 'date';
+        inputElement.value = currentValue;
+    } else if (fieldName === 'first_name') {
+        displayElement = document.querySelector('h2');
+        inputElement = document.createElement('input');
+        inputElement.type = 'text';
+        inputElement.value = currentValue;
+    } else if (fieldName === 'last_name') {
+        displayElement = document.querySelector('h2');
+        inputElement = document.createElement('input');
+        inputElement.type = 'text';
+        inputElement.value = currentValue;
+    }
+    
+    // Create save and cancel buttons
+    saveButton = document.createElement('button');
+    saveButton.className = 'btn btn-sm btn-success ms-2';
+    saveButton.innerHTML = '<i class="fas fa-check"></i>';
+    saveButton.onclick = () => saveField(fieldName, inputElement.value, displayElement);
+    
+    cancelButton = document.createElement('button');
+    cancelButton.className = 'btn btn-sm btn-secondary ms-1';
+    cancelButton.innerHTML = '<i class="fas fa-times"></i>';
+    cancelButton.onclick = () => cancelEdit(displayElement, currentValue, fieldName);
+    
+    // Replace display with input
+    const parent = displayElement.parentNode;
+    parent.insertBefore(inputElement, displayElement);
+    parent.insertBefore(saveButton, displayElement.nextSibling);
+    parent.insertBefore(cancelButton, saveButton.nextSibling);
+    displayElement.style.display = 'none';
+    
+    // Focus on input
+    inputElement.focus();
+}
+
+function saveField(fieldName, newValue, displayElement) {
+    const studentId = {{ student.id }};
+    
+    fetch('{% url "inline_edit_student_field" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `student_id=${studentId}&field_name=${fieldName}&field_value=${encodeURIComponent(newValue)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update display
+            if (fieldName === 'status') {
+                const badgeClass = newValue === 'active' ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger';
+                displayElement.innerHTML = `<span class="badge ${badgeClass}">${data.display_value}</span>`;
+            } else if (fieldName === 'notes') {
+                displayElement.innerHTML = data.display_value;
+            } else {
+                displayElement.textContent = data.display_value;
+            }
+            
+            // Show success message
+            showMessage('success', data.message);
+        } else {
+            showMessage('error', data.error || 'Error updating field');
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Error updating field');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        cancelEdit(displayElement, null, fieldName, true);
+    });
+}
+
+function cancelEdit(displayElement, originalValue, fieldName, skipRestore = false) {
+    const parent = displayElement.parentNode;
+    const input = parent.querySelector('select, textarea, input');
+    const saveBtn = parent.querySelector('.btn-success');
+    const cancelBtn = parent.querySelector('.btn-secondary');
+    
+    if (input) input.remove();
+    if (saveBtn) saveBtn.remove();
+    if (cancelBtn) cancelBtn.remove();
+    
+    displayElement.style.display = '';
+    
+    if (!skipRestore && originalValue !== null) {
+        if (fieldName === 'status') {
+            const badgeClass = originalValue === 'active' ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger';
+            displayElement.innerHTML = `<span class="badge ${badgeClass}">${originalValue === 'active' ? 'Active' : 'Inactive'}</span>`;
+        } else if (fieldName === 'notes') {
+            displayElement.innerHTML = originalValue || 'No notes added yet.';
+        } else {
+            displayElement.textContent = originalValue;
+        }
+    }
+}
+
+function showMessage(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alertHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    const messagesContainer = document.querySelector('.messages') || document.createElement('div');
+    if (!document.querySelector('.messages')) {
+        messagesContainer.className = 'messages mb-3';
+        document.querySelector('.container-fluid').insertBefore(messagesContainer, document.querySelector('.card'));
+    }
+    
+    messagesContainer.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        const alert = messagesContainer.querySelector('.alert:last-child');
+        if (alert) {
+            alert.remove();
+        }
+    }, 3000);
+}
+
+function editName(firstName, lastName) {
+    const displayElement = document.getElementById('name-display');
+    const parent = displayElement.parentNode;
+    
+    // Create input fields
+    const firstInput = document.createElement('input');
+    firstInput.type = 'text';
+    firstInput.className = 'form-control form-control-sm d-inline-block';
+    firstInput.style.width = '120px';
+    firstInput.value = firstName;
+    firstInput.placeholder = 'First name';
+    firstInput.id = 'edit-first-name';
+    
+    const lastInput = document.createElement('input');
+    lastInput.type = 'text';
+    lastInput.className = 'form-control form-control-sm d-inline-block ms-2';
+    lastInput.style.width = '120px';
+    lastInput.value = lastName;
+    lastInput.placeholder = 'Last name';
+    lastInput.id = 'edit-last-name';
+    
+    // Save and cancel buttons
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm btn-success ms-2';
+    saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+    saveBtn.onclick = function() {
+        saveName(firstInput.value, lastInput.value, displayElement);
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+    cancelBtn.onclick = function() {
+        cancelEditName(displayElement, firstName, lastName);
+    };
+    
+    // Insert inputs and buttons
+    parent.insertBefore(firstInput, displayElement);
+    parent.insertBefore(lastInput, displayElement);
+    parent.insertBefore(saveBtn, displayElement.nextSibling);
+    parent.insertBefore(cancelBtn, saveBtn.nextSibling);
+    displayElement.style.display = 'none';
+    firstInput.focus();
+}
+
+function saveName(newFirst, newLast, displayElement) {
+    const studentId = {{ student.id }};
+    fetch('{% url "inline_edit_student_field" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `student_id=${studentId}&field_name=first_name&field_value=${encodeURIComponent(newFirst)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Now update last name
+            fetch('{% url "inline_edit_student_field" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: `student_id=${studentId}&field_name=last_name&field_value=${encodeURIComponent(newLast)}`
+            })
+            .then(response2 => response2.json())
+            .then(data2 => {
+                if (data2.success) {
+                    displayElement.textContent = `${newFirst} ${newLast}`;
+                    showMessage('success', 'Name updated successfully');
+                } else {
+                    showMessage('error', data2.error || 'Error updating last name');
+                }
+            });
+        } else {
+            showMessage('error', data.error || 'Error updating first name');
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Error updating name');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        cancelEditName(displayElement, newFirst, newLast, true);
+    });
+}
+
+function cancelEditName(displayElement, firstName, lastName, skipRestore = false) {
+    const parent = displayElement.parentNode;
+    const firstInput = parent.querySelector('#edit-first-name');
+    const lastInput = parent.querySelector('#edit-last-name');
+    const saveBtn = parent.querySelector('.btn-success');
+    const cancelBtn = parent.querySelector('.btn-secondary');
+    if (firstInput) firstInput.remove();
+    if (lastInput) lastInput.remove();
+    if (saveBtn) saveBtn.remove();
+    if (cancelBtn) cancelBtn.remove();
+    displayElement.style.display = '';
+    if (!skipRestore) {
+        displayElement.textContent = `${firstName} ${lastName}`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     toggleNewPayerFields();
+    
+    // Add CSRF token to page
+    if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.value = '{{ csrf_token }}';
+        document.body.appendChild(csrfToken);
+    }
 });
 </script>
 {% endblock %}
