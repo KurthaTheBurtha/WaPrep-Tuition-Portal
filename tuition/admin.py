@@ -1,8 +1,33 @@
 from django.contrib import admin
 from .models import (
-    Student, StudentPayer, Payment, PaymentReceipt, PaymentReminder,
+    User, Student, StudentPayer, Payment, PaymentReceipt, PaymentReminder,
     PaymentPlan, PaymentInstallment, AccountRequest, Vendor
 )
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    list_display = ('username', 'first_name', 'last_name', 'email', 'user_type', 'is_active', 'date_joined')
+    list_filter = ('user_type', 'is_active', 'date_joined')
+    search_fields = ('username', 'first_name', 'last_name', 'email', 'user_id')
+    ordering = ('last_name', 'first_name')
+    readonly_fields = ('date_joined', 'last_login')
+    
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('username', 'first_name', 'last_name', 'email', 'user_id')
+        }),
+        ('Account Information', {
+            'fields': ('user_type', 'is_active', 'is_staff', 'is_superuser')
+        }),
+        ('Important Dates', {
+            'fields': ('date_joined', 'last_login'),
+            'classes': ('collapse',)
+        }),
+        ('Permissions', {
+            'fields': ('groups', 'user_permissions'),
+            'classes': ('collapse',)
+        }),
+    )
 
 class StudentPayerInline(admin.TabularInline):
     model = StudentPayer

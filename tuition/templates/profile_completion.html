@@ -81,65 +81,6 @@
                         </div>
                     </div>
 
-                    <!-- Contact Information Section -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h5 class="mb-0">Contact Information</h5>
-                            <small class="text-muted">Phone number and address are required</small>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="{{ form.phone_number.id_for_label }}" class="form-label">
-                                            {{ form.phone_number.label }} *
-                                        </label>
-                                        {{ form.phone_number }}
-                                        {% if form.phone_number.errors %}
-                                            <div class="text-danger">
-                                                {% for error in form.phone_number.errors %}
-                                                    {{ error }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="{{ form.contact_info.id_for_label }}" class="form-label">
-                                            {{ form.contact_info.label }}
-                                        </label>
-                                        {{ form.contact_info }}
-                                        {% if form.contact_info.errors %}
-                                            <div class="text-danger">
-                                                {% for error in form.contact_info.errors %}
-                                                    {{ error }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="mb-3">
-                                        <label for="{{ form.address.id_for_label }}" class="form-label">
-                                            {{ form.address.label }} *
-                                        </label>
-                                        {{ form.address }}
-                                        {% if form.address.errors %}
-                                            <div class="text-danger">
-                                                {% for error in form.address.errors %}
-                                                    {{ error }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Form-level errors -->
                     {% if form.non_field_errors %}
                     <div class="alert alert-danger">

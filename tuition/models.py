@@ -12,12 +12,9 @@ class User(AbstractUser):
     )
     
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
-    phone_number = models.CharField(max_length=15, blank=True)
-    address = models.TextField(blank=True)
-    contact_info = models.TextField(blank=True)
     user_id = models.CharField(max_length=30, unique=True, null=True, blank=False)
     stripe_customer_id = models.CharField(max_length=64, blank=True, null=True)
-     
+    
     def is_admin(self):
         return self.user_type == 'admin'
 
@@ -146,7 +143,7 @@ class AccountRequest(models.Model):
     child_first_name = models.CharField(max_length=100)
     child_last_name = models.CharField(max_length=100)
     email = models.EmailField()
-    contact_info = models.TextField(blank=True)
+    student_names = models.TextField(blank=True, help_text="Enter the names of all students you are responsible for")
 
     submitted_at = models.DateTimeField(auto_now_add=True)
 
@@ -209,3 +206,18 @@ class Card(models.Model):
 
     def __str__(self):
         return f"{self.nickname} ({self.brand} ****{self.last4})"
+
+class PasswordReset(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"Password reset for {self.user.email}"
+    
+    def is_expired(self):
+        # Token expires after 24 hours
+        from django.utils import timezone
+        from datetime import timedelta
+        return self.created_at < timezone.now() - timedelta(hours=24)

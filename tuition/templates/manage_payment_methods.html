@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">My Payment Methods</h4>
+                    <a href="{% url 'add_payment_method' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Add Payment Method
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Credit/Debit Cards -->
+                    {% if saved_cards %}
+                    <div class="mb-4">
+                        <h5><i class="fas fa-credit-card text-primary"></i> Credit/Debit Cards</h5>
+                        <div class="row">
+                            {% for card in saved_cards %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-primary">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="card-title mb-1">{{ card.nickname }}</h6>
+                                                <p class="text-muted mb-1">
+                                                    <i class="fas fa-credit-card"></i>
+                                                    {{ card.brand }} ****{{ card.last4 }}
+                                                </p>
+                                                <small class="text-muted">
+                                                    Expires {{ card.exp_month }}/{{ card.exp_year }}
+                                                </small>
+                                            </div>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                                                        type="button" data-bs-toggle="dropdown">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" 
+                                                           onclick="deletePaymentMethod('card', {{ card.id }}, '{{ card.nickname }}')">
+                                                            <i class="fas fa-trash text-danger"></i> Remove
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Bank Accounts -->
+                    {% if saved_bank_accounts %}
+                    <div class="mb-4">
+                        <h5><i class="fas fa-university text-success"></i> Bank Accounts</h5>
+                        <div class="row">
+                            {% for account in saved_bank_accounts %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="card-title mb-1">{{ account.nickname }}</h6>
+                                                <p class="text-muted mb-1">
+                                                    <i class="fas fa-university"></i>
+                                                    ****{{ account.last4 }} • {{ account.account_type|title }}
+                                                </p>
+                                                <small class="text-muted">
+                                                    Added {{ account.created_at|date:"M d, Y" }}
+                                                </small>
+                                            </div>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                                                        type="button" data-bs-toggle="dropdown">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" 
+                                                           onclick="deletePaymentMethod('bank', {{ account.id }}, '{{ account.nickname }}')">
+                                                            <i class="fas fa-trash text-danger"></i> Remove
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- No Payment Methods -->
+                    {% if not saved_cards and not saved_bank_accounts %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No payment methods added yet</h5>
+                        <p class="text-muted">Add a payment method to make secure payments</p>
+                        <a href="{% url 'add_payment_method' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Your First Payment Method
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Payment Methods</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'add_payment_method' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-credit-card"></i> Add Credit/Debit Card
+                        </a>
+                        <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success">
+                            <i class="fas fa-university"></i> Add Bank Account
+                        </a>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6>Security Information</h6>
+                    <div class="alert alert-info small">
+                        <i class="fas fa-shield-alt"></i>
+                        <strong>Secure:</strong> All payment information is encrypted and stored securely by Stripe. 
+                        We never store your full account numbers.
+                    </div>
+                    
+                    <h6>Payment Processing</h6>
+                    <div class="small">
+                        <p><strong>Credit/Debit Cards:</strong> Processed immediately</p>
+                        <p><strong>Bank Accounts (ACH):</strong> Typically 3-5 business days</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deletePaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Payment Method</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="paymentMethodName"></strong>?</p>
+                <p class="text-muted small">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'delete_payment_method' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="payment_method_type" id="deletePaymentMethodType">
+                    <input type="hidden" name="payment_method_id" id="deletePaymentMethodId">
+                    <button type="submit" class="btn btn-danger">Remove Payment Method</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function deletePaymentMethod(type, id, name) {
+    document.getElementById('deletePaymentMethodType').value = type;
+    document.getElementById('deletePaymentMethodId').value = id;
+    document.getElementById('paymentMethodName').textContent = name;
+    new bootstrap.Modal(document.getElementById('deletePaymentModal')).show();
+}
+</script>
+{% endblock %} 

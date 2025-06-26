@@ -83,21 +83,25 @@
                     <h5 class="mb-3">Linked Payers</h5>
                     {% for sp in student.studentpayer_set.all %}
                     <div class="d-flex align-items-center justify-content-between mb-3 p-3 border rounded">
-                        <div>
-                            <strong>{{ sp.payer.first_name }} {{ sp.payer.last_name }}</strong><br>
-                            <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %} (Primary){% endif %}</small><br>
-                            <small class="text-muted">{{ sp.payer.email }}</small>
+                        <div class="d-flex align-items-center">
+                            <div>
+                                <strong>{{ sp.payer.first_name }} {{ sp.payer.last_name }}
+                                    {% if sp.payer.is_active %}
+                                        <span class="badge bg-success ms-2 align-middle">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark ms-2 align-middle">Pending Activation</span>
+                                    {% endif %}
+                                </strong><br>
+                                <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %} (Primary){% endif %}</small><br>
+                                <small class="text-muted">{{ sp.payer.email }}</small>
+                            </div>
                         </div>
                         <div class="text-end">
-                            {% if sp.payer.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Pending Activation</span>
-                                <br>
+                            {% if not sp.payer.is_active %}
                                 <form method="post" action="{% url 'send_activation_email' sp.id %}" style="display:inline;">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-primary mt-1">
-                                        <i class="fas fa-envelope me-1"></i> Resend Activation
+                                        <i class="fas fa-envelope me-1"></i> Send Activation
                                     </button>
                                 </form>
                             {% endif %}

@@ -208,37 +208,5 @@
         </div>
     </div>
 </div>
-
-<!-- Add Bank Account Modal -->
-<div class="modal fade" id="addBankModal" tabindex="-1" aria-labelledby="addBankModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <form method="post" action="{% url 'add_bank_account' %}">
-            {% csrf_token %}
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addBankModalLabel">Add Bank Account</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="accountName" class="form-label">Name on Account</label>
-                        <input type="text" class="form-control" name="account_name" id="accountName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="routingNumber" class="form-label">Routing Number</label>
-                        <input type="text" class="form-control" name="routing_number" id="routingNumber" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="accountNumber" class="form-label">Account Number</label>
-                        <input type="text" class="form-control" name="account_number" id="accountNumber" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-success">Save Account</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
     
 {% endblock %}

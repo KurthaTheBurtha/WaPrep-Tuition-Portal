@@ -5,14 +5,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem
+from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem, PasswordReset
 import random
 import string
 from django.core.mail import send_mail
 from django.db import models
 from .forms import AccountRequestForm, ProfileCompletionForm
 from django.conf import settings
-from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
 from django.db.models import Sum
 from decouple import config
 from .bill_api import (
@@ -27,6 +26,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from io import BytesIO
 from django.views.decorators.http import require_POST
+from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
+from decimal import Decimal
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -110,11 +111,6 @@ def payment(request, student_id):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('payer_login')
     
-    # Check if user has completed their profile
-    if not request.user.phone_number or not request.user.address:
-        messages.warning(request, 'Please complete your profile before making payments.')
-        return redirect('profile_completion')
-    
     student = get_object_or_404(Student, id=student_id)
     
     # Check if the current user is authorized to pay for this student
@@ -132,9 +128,11 @@ def payment(request, student_id):
         due_date__month=current_month
     ).order_by('due_date')
     total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
+    
     # Stripe integration
     stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
     customer_id = get_or_create_stripe_customer(request.user)
+    
     # Create a PaymentIntent for the amount due (convert to cents)
     if total_amount_due > 0:
         payment_intent = stripe.PaymentIntent.create(
@@ -142,6 +140,7 @@ def payment(request, student_id):
             currency='usd',
             customer=customer_id,
             setup_future_usage='off_session',
+            payment_method_types=['card', 'us_bank_account'],
             metadata={
                 'student_id': student_id,
                 'user_id': request.user.id
@@ -169,96 +168,128 @@ def process_payment(request):
         student = get_object_or_404(Student, id=student_id)
         amount = request.POST.get('amount')
         payment_intent_id = request.POST.get('payment_intent_id')
+        saved_payment_method_id = request.POST.get('saved_payment_method_id')
+        
         try:
-            # Retrieve the PaymentIntent from Stripe
-            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-            if payment_intent.status not in ['succeeded', 'processing', 'requires_capture']:
+            # Handle saved payment method
+            if saved_payment_method_id:
+                # Extract the actual payment method ID
+                if saved_payment_method_id.startswith('saved_method_'):
+                    actual_payment_method_id = saved_payment_method_id.replace('saved_method_', '')
+                else:
+                    actual_payment_method_id = saved_payment_method_id
+                
+                # Create a PaymentIntent using the saved payment method
+                customer_id = get_or_create_stripe_customer(request.user)
+                payment_intent = stripe.PaymentIntent.create(
+                    amount=int(float(amount) * 100),
+                    currency='usd',
+                    customer=customer_id,
+                    payment_method=actual_payment_method_id,
+                    confirm=True,
+                    off_session=True,
+                    metadata={
+                        'student_id': student_id,
+                        'user_id': request.user.id
+                    }
+                )
+                
+                payment_intent_id = payment_intent.id
+            else:
+                # Handle new payment method
+                payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            
+            # Check if payment was successful
+            if payment_intent.status == 'succeeded':
+                # Payment was successful, now create database records
+                
+                # Get payment method details for display purposes only (not stored)
+                pm = stripe.PaymentMethod.retrieve(payment_intent.payment_method)
+                payment_method_type = pm.type
+                
+                # Get current month's payment items
+                now = timezone.now()
+                current_month = now.month
+                current_year = now.year
+                payment_items = PaymentBreakdown.objects.filter(
+                    student=student,
+                    is_paid=False,
+                    due_date__year=current_year,
+                    due_date__month=current_month
+                )
+                
+                # Create payment record only after confirming success
+                payment = Payment.objects.create(
+                    student=student,
+                    amount=amount,
+                    status='completed',
+                    bank_account=None,  # No bank account reference stored
+                    receipt_number=payment_intent.id
+                )
+                
+                # Create PaymentItem records to link payment to breakdown items
+                total_payment_amount = Decimal(str(amount))
+                payment_items_list = list(payment_items)
+                
+                if payment_items_list:
+                    # Calculate how much each item should be paid
+                    # For now, we'll distribute the payment proportionally across all items
+                    total_items_amount = sum(item.amount for item in payment_items_list)
+                    
+                    for item in payment_items_list:
+                        if total_items_amount > 0:
+                            # Calculate proportional amount for this item
+                            item_amount = (item.amount / total_items_amount) * total_payment_amount
+                            # Round to 2 decimal places
+                            item_amount = round(item_amount, 2)
+                        else:
+                            item_amount = Decimal('0.00')
+                        
+                        # Create PaymentItem record
+                        PaymentItem.objects.create(
+                            payment=payment,
+                            breakdown_item=item,
+                            amount_paid=item_amount
+                        )
+                    
+                    # Mark payment items as paid
+                    payment_items.update(is_paid=True)
+                
+                # Determine payment method type for success message
+                payment_method_name = "payment method"
+                if payment_method_type == 'card':
+                    payment_method_name = f"{pm.card.brand.title()} card ending in {pm.card.last4}"
+                elif payment_method_type == 'us_bank_account':
+                    payment_method_name = f"bank account ending in {pm.us_bank_account.last4}"
+                
+                messages.success(request, f"✅ Payment of ${amount} completed successfully using {payment_method_name}. A receipt is now available.")
+                return redirect('payment_history')
+                
+            elif payment_intent.status == 'processing':
+                # Payment is being processed (common for bank transfers)
+                messages.info(request, f"Payment of ${amount} is being processed. You'll receive a confirmation once it's completed.")
+                return redirect('payment_history')
+                
+            elif payment_intent.status == 'requires_capture':
+                # Payment requires capture (for manual capture scenarios)
+                messages.warning(request, f"Payment of ${amount} requires manual capture. Please contact support.")
+                return redirect('payment_history')
+                
+            else:
+                # Payment failed or is in an unexpected state
                 messages.error(request, f"Payment failed or incomplete. Status: {payment_intent.status}")
                 return redirect('payment', student_id=student_id)
-            # Get payment method details
-            pm = stripe.PaymentMethod.retrieve(payment_intent.payment_method)
-            # Save payment record
-            from .models import Card, BankAccount
-            bank_account = None
-            card = None
-            payment_method_type = pm.type
-            if payment_method_type == 'card':
-                card_obj, _ = Card.objects.get_or_create(
-                    user=request.user,
-                    stripe_payment_method_id=pm.id,
-                    defaults={
-                        'nickname': f"{pm.card.brand.title()} ****{pm.card.last4}",
-                        'last4': pm.card.last4,
-                        'brand': pm.card.brand.title(),
-                        'exp_month': pm.card.exp_month,
-                        'exp_year': pm.card.exp_year,
-                    }
-                )
-                card = card_obj
-            elif payment_method_type == 'us_bank_account':
-                bank_obj, _ = BankAccount.objects.get_or_create(
-                    user=request.user,
-                    stripe_payment_method_id=pm.id,
-                    defaults={
-                        'nickname': f"Bank ****{pm.us_bank_account.last4}",
-                        'account_type': pm.us_bank_account.account_type,
-                        'last4': pm.us_bank_account.last4,
-                        'provider_token': '',
-                    }
-                )
-                bank_account = bank_obj
-            # Get current month's payment items
-            now = timezone.now()
-            current_month = now.month
-            current_year = now.year
-            payment_items = PaymentBreakdown.objects.filter(
-                student=student,
-                is_paid=False,
-                due_date__year=current_year,
-                due_date__month=current_month
-            )
-            # Create payment record
-            payment = Payment.objects.create(
-                student=student,
-                amount=amount,
-                status='completed' if payment_intent.status == 'succeeded' else 'pending',
-                bank_account=bank_account,
-                receipt_number=payment_intent.id
-            )
             
-            # Create PaymentItem records to link payment to breakdown items
-            total_payment_amount = float(amount)
-            payment_items_list = list(payment_items)
-            
-            if payment_items_list:
-                # Calculate how much each item should be paid
-                # For now, we'll distribute the payment proportionally across all items
-                total_items_amount = sum(item.amount for item in payment_items_list)
-                
-                for item in payment_items_list:
-                    if total_items_amount > 0:
-                        # Calculate proportional amount for this item
-                        item_amount = (item.amount / total_items_amount) * total_payment_amount
-                        # Round to 2 decimal places
-                        item_amount = round(item_amount, 2)
-                    else:
-                        item_amount = 0
-                    
-                    # Create PaymentItem record
-                    PaymentItem.objects.create(
-                        payment=payment,
-                        breakdown_item=item,
-                        amount_paid=item_amount
-                    )
-                
-                # Mark payment items as paid
-                payment_items.update(is_paid=True)
-            
-            messages.success(request, f"✅ Payment of ${amount} submitted successfully. A receipt will be available once the payment is processed.")
-            return redirect('payment_history')
+        except stripe.error.CardError as e:
+            messages.error(request, f"Card error: {e.error.message}")
+            return redirect('payment', student_id=student_id)
+        except stripe.error.InvalidRequestError as e:
+            messages.error(request, f"Invalid request: {e.error.message}")
+            return redirect('payment', student_id=student_id)
         except Exception as e:
             messages.error(request, f"Payment failed: {str(e)}")
             return redirect('payment', student_id=student_id)
+    
     return redirect('payment_history')
 
 @login_required
@@ -267,11 +298,6 @@ def payment_history(request):
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('payer_login')
-    
-    # Check if user has completed their profile
-    if not request.user.phone_number or not request.user.address:
-        messages.warning(request, 'Please complete your profile before viewing payment history.')
-        return redirect('profile_completion')
     
     # Get all students associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
@@ -330,6 +356,39 @@ def download_receipt(request, payment_id):
     y -= 20
     p.drawString(50, y, f'Status: {payment.status.capitalize()}')
     y -= 30
+    # Payment Breakdown
+    payment_items = PaymentItem.objects.filter(payment=payment).select_related('breakdown_item')
+    if payment_items.exists():
+        p.setFont('Helvetica-Bold', 14)
+        p.drawString(50, y, 'Payment Breakdown:')
+        y -= 20
+        p.setFont('Helvetica-Bold', 12)
+        p.drawString(50, y, 'Description')
+        p.drawString(250, y, 'Due Date')
+        p.drawString(400, y, 'Amount Paid')
+        y -= 15
+        p.setFont('Helvetica', 12)
+        for item in payment_items:
+            desc = item.breakdown_item.description
+            due = item.breakdown_item.due_date.strftime('%b %d, %Y') if item.breakdown_item.due_date else 'N/A'
+            amt = f"${item.amount_paid:.2f}"
+            p.drawString(50, y, desc[:30])
+            p.drawString(250, y, due)
+            p.drawString(400, y, amt)
+            y -= 15
+            if y < 80:
+                p.showPage()
+                y = height - 50
+                p.setFont('Helvetica', 12)
+        # Subtotal
+        p.setFont('Helvetica-Bold', 12)
+        p.drawString(250, y, 'Total:')
+        p.drawString(400, y, f"${payment.amount:.2f}")
+        y -= 20
+    else:
+        p.setFont('Helvetica-Oblique', 11)
+        p.drawString(50, y, 'Detailed breakdown not available for this payment.')
+        y -= 20
     # Footer
     p.setFont('Helvetica-Oblique', 10)
     p.drawString(50, y, 'Thank you for your payment!')
@@ -406,6 +465,61 @@ def admin_dashboard(request):
     return render(request, 'admin_dashboard.html', context)
 
 def forgot_password(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        
+        try:
+            # Check if user exists with this email
+            user = User.objects.get(email=email)
+            
+            # Generate a unique token
+            import secrets
+            token = secrets.token_urlsafe(32)
+            
+            # Create password reset record
+            PasswordReset.objects.create(
+                user=user,
+                token=token
+            )
+            
+            # Send reset email
+            reset_url = request.build_absolute_uri(f'/reset-password/{token}/')
+            subject = 'WaPrep Tuition Portal - Password Reset'
+            message = f"""
+Hello {user.first_name},
+
+You have requested to reset your password for the WaPrep Tuition Portal.
+
+To reset your password, please click the following link:
+{reset_url}
+
+This link will expire in 24 hours.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+WAPrep Administration
+            """.strip()
+            
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            
+            messages.success(request, 'Password reset link has been sent to your email address.')
+            return redirect('payer_login')
+            
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not for security
+            messages.success(request, 'If an account with that email exists, a password reset link has been sent.')
+            return redirect('payer_login')
+        except Exception as e:
+            messages.error(request, f'Error sending reset email: {str(e)}')
+            return redirect('forgot_password')
+    
     return render(request, 'forgot_password.html')
 
 @login_required
@@ -678,42 +792,10 @@ def add_payer_to_student(request):
                     email=email,
                     password=temp_password,
                     user_type='payer',
-                    user_id=user_id
+                    user_id=user_id,
+                    is_active=False
                 )
-                # Send activation email
-                activation_url = request.build_absolute_uri(f'/activate-account/{payer.id}/{temp_password}/')
-                subject = 'Welcome to WaPrep Tuition Portal - Activate Your Account'
-                message = f"""
-Hello {first_name},
-
-Welcome to the Washington Preparatory School Tuition Portal!
-
-You have been added as a payer for {student.first_name} {student.last_name}.
-
-Your User ID: {user_id}
-Your Temporary Password: {temp_password}
-
-To activate your account, please click the following link:
-{activation_url}
-
-After activation, you will be required to:
-1. Change your password
-2. Add your phone number (required)
-3. Add your address (required)
-4. Add any additional contact information (optional)
-
-If you have any questions, please contact us.
-
-Best regards,
-WaPrep Administration
-                """.strip()
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    fail_silently=False,
-                )
+                # Note: Activation email will be sent manually via admin interface
             
             # If this is set as primary, unset any existing primary payer
             if is_primary:
@@ -729,7 +811,7 @@ WaPrep Administration
                     relationship=relationship,
                     is_primary=is_primary
                 )
-                messages.success(request, f'Added {payer.get_full_name()} as {relationship} for {student}. Activation email sent to {email}.')
+                messages.success(request, f'Added {payer.get_full_name()} as {relationship} for {student}.')
         except Exception as e:
             messages.error(request, f'Error adding payer: {str(e)}')
     
@@ -767,16 +849,12 @@ Your Temporary Password: {temp_password}
 To activate your account, please click the following link:
 {activation_url}
 
-After activation, you will be required to:
-1. Change your password
-2. Add your phone number (required)
-3. Add your address (required)
-4. Add any additional contact information (optional)
+After activation, you will be required to change your password
 
 If you have any questions, please contact us.
 
 Best regards,
-WaPrep Administration
+WAPrep Administration
         """.strip()
         
         send_mail(
@@ -797,16 +875,67 @@ def activate_account(request, user_id, temp_password):
     try:
         user = get_object_or_404(User, id=user_id)
         if user.check_password(temp_password):
-            # Log the user in
-            login(request, user)
-            # Redirect to profile completion
-            messages.success(request, 'Account activated successfully! Please complete your profile.')
-            return redirect('profile_completion')
+            # Store user info in session for activation process
+            request.session['activation_user_id'] = user.id
+            request.session['activation_temp_password'] = temp_password
+            # Redirect to activation page
+            messages.success(request, 'Please set your new password to activate your account.')
+            return redirect('activation_setup')
         else:
             messages.error(request, 'Invalid activation link.')
             return redirect('payer_login')
     except Exception as e:
         messages.error(request, 'Error activating account.')
+        return redirect('payer_login')
+
+def activation_setup(request):
+    # Check if user has valid activation session
+    user_id = request.session.get('activation_user_id')
+    temp_password = request.session.get('activation_temp_password')
+    
+    if not user_id or not temp_password:
+        messages.error(request, 'Invalid activation session.')
+        return redirect('payer_login')
+    
+    try:
+        user = get_object_or_404(User, id=user_id)
+        if not user.check_password(temp_password):
+            messages.error(request, 'Invalid activation session.')
+            return redirect('payer_login')
+        
+        if request.method == 'POST':
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            
+            if new_password != confirm_password:
+                messages.error(request, 'Passwords do not match.')
+            elif len(new_password) < 8:
+                messages.error(request, 'Password must be at least 8 characters long.')
+            else:
+                try:
+                    # Set new password and activate account
+                    user.set_password(new_password)
+                    user.is_active = True
+                    user.save()
+                    
+                    # Clear activation session before logging in
+                    if 'activation_user_id' in request.session:
+                        del request.session['activation_user_id']
+                    if 'activation_temp_password' in request.session:
+                        del request.session['activation_temp_password']
+                    
+                    # Log the user in
+                    login(request, user)
+                    
+                    messages.success(request, 'Account activated successfully! Welcome to your dashboard.')
+                    return redirect('payer_dashboard')
+                except Exception as e:
+                    messages.error(request, f'Error saving password: {str(e)}')
+        
+        return render(request, 'activation_setup.html', {'user': user})
+        
+    except Exception as e:
+        messages.error(request, f'Error during activation: {str(e)}')
         return redirect('payer_login')
 
 @login_required
@@ -888,11 +1017,6 @@ def payer_dashboard(request):
     if request.user.user_type != 'payer':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('payer_login')
-    
-    # Check if user has completed their profile (phone number and address are required)
-    if not request.user.phone_number or not request.user.address:
-        messages.warning(request, 'Please complete your profile before accessing the dashboard.')
-        return redirect('profile_completion')
     
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
@@ -1002,7 +1126,7 @@ A new payer has submitted an account request:
 
 Name: {request_obj.first_name} {request_obj.last_name}
 Email: {request_obj.email}
-Other Contact Info: {request_obj.contact_info}
+Students Responsible For: {request_obj.student_names}
 
 Please review and follow up accordingly.
             """.strip()
@@ -1029,9 +1153,239 @@ def payer_welcome(request):
         return redirect('payer_login')
     # Force password change if flagged
     if request.session.get('force_password_change', False):
-        messages.warning(request, 'Please change your password and complete your profile (address and phone required) before continuing.')
+        messages.warning(request, 'Please change your password before continuing.')
         return redirect('payer_profile')
     return render(request, 'payer_welcome.html')
+
+def profile_completion(request):
+    # Allow both active and inactive users who are logged in
+    if not request.user.is_authenticated:
+        messages.error(request, 'Please log in to access this page.')
+        return redirect('payer_login')
+    
+    if request.user.user_type != 'payer':
+        messages.error(request, 'Only payers can access this page.')
+        return redirect('payer_login')
+
+    if request.method == 'POST':
+        form = ProfileCompletionForm(request.POST)
+        if form.is_valid():
+            # Set the new password
+            new_password = form.cleaned_data.get('new_password1')
+            if new_password:
+                request.user.set_password(new_password)
+                # Activate the user when they set their password
+                request.user.is_active = True
+                request.user.save()
+            
+            # Re-authenticate the user with the new password
+            login(request, request.user)
+            
+            messages.success(request, 'Profile completed successfully! You can now access your dashboard.')
+            return redirect('payer_dashboard')
+    else:
+        form = ProfileCompletionForm()
+
+    return render(request, 'profile_completion.html', {'form': form})
+
+@login_required
+def inline_edit_student_field(request):
+    """Handle inline editing of student fields via AJAX"""
+    if request.user.user_type != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        field_name = request.POST.get('field_name')
+        field_value = request.POST.get('field_value')
+        
+        try:
+            student = get_object_or_404(Student, id=student_id)
+            
+            # Validate field name
+            allowed_fields = ['first_name', 'last_name', 'grade', 'status', 'notes', 'date_of_birth']
+            if field_name not in allowed_fields:
+                return JsonResponse({'error': 'Invalid field'}, status=400)
+            
+            # Set the field value
+            setattr(student, field_name, field_value)
+            student.save()
+            
+            # Return the formatted value for display
+            if field_name == 'status':
+                display_value = student.get_status_display()
+            elif field_name == 'grade':
+                display_value = f"Grade {field_value}"
+            elif field_name == 'notes':
+                display_value = field_value if field_value else "No notes added yet."
+            elif field_name == 'date_of_birth':
+                try:
+                    date_obj = datetime.strptime(field_value, '%Y-%m-%d').date()
+                    display_value = date_obj.strftime('%b %d, %Y')
+                except:
+                    display_value = field_value
+            else:
+                display_value = field_value
+                
+            return JsonResponse({
+                'success': True,
+                'display_value': display_value,
+                'message': f'{field_name.replace("_", " ").title()} updated successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@login_required
+def monthly_bills(request, student_id, month_key):
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Parse the month key (format: YYYY-MM)
+    try:
+        year, month = month_key.split('-')
+        year = int(year)
+        month = int(month)
+        
+        # Get the first and last day of the month
+        from datetime import datetime, date
+        first_day = date(year, month, 1)
+        if month == 12:
+            last_day = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            last_day = date(year, month + 1, 1) - timedelta(days=1)
+        
+        month_display = first_day.strftime('%B %Y')
+        
+    except (ValueError, IndexError):
+        messages.error(request, 'Invalid month format.')
+        return redirect('student_months', student_id=student_id)
+    
+    # Get all bills for this student in this month
+    bills = student.payment_breakdowns.filter(
+        due_date__gte=first_day,
+        due_date__lte=last_day
+    ).order_by('due_date')
+    
+    # Calculate totals
+    total_amount = bills.aggregate(total=models.Sum('amount'))['total'] or 0
+    paid_amount = bills.filter(is_paid=True).aggregate(total=models.Sum('amount'))['total'] or 0
+    unpaid_amount = bills.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+    total_bills = bills.count()
+    paid_bills = bills.filter(is_paid=True).count()
+    unpaid_bills = bills.filter(is_paid=False).count()
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            description = request.POST.get('description')
+            amount = request.POST.get('amount')
+            due_date = request.POST.get('due_date')
+            
+            try:
+                PaymentBreakdown.objects.create(
+                    student=student,
+                    description=description,
+                    amount=amount,
+                    due_date=due_date,
+                    is_paid=False
+                )
+                messages.success(request, 'Bill added successfully.')
+            except Exception as e:
+                messages.error(request, f'Error adding bill: {str(e)}')
+        elif action == 'remove':
+            bill_id = request.POST.get('bill_id')
+            try:
+                bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                bill.delete()
+                messages.success(request, 'Bill removed successfully.')
+            except Exception as e:
+                messages.error(request, f'Error removing bill: {str(e)}')
+        
+        return redirect('monthly_bills', student_id=student_id, month_key=month_key)
+    
+    context = {
+        'student': student,
+        'month_key': month_key,
+        'month_display': month_display,
+        'bills': bills,
+        'total_amount': total_amount,
+        'paid_amount': paid_amount,
+        'unpaid_amount': unpaid_amount,
+        'total_bills': total_bills,
+        'paid_bills': paid_bills,
+        'unpaid_bills': unpaid_bills,
+        'first_day': first_day,
+        'last_day': last_day
+    }
+    return render(request, 'monthly_bills.html', context)
+
+@login_required
+def student_months(request, student_id):
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Get all bills for this student with due dates
+    all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('-due_date')
+    
+    # Group bills by month
+    monthly_billing = {}
+    for bill in all_bills:
+        month_key = bill.due_date.strftime('%Y-%m')
+        month_display = bill.due_date.strftime('%B %Y')
+        
+        if month_key not in monthly_billing:
+            monthly_billing[month_key] = {
+                'month_display': month_display,
+                'month_key': month_key,
+                'total_bills': 0,
+                'total_amount': 0,
+                'paid_bills': 0,
+                'unpaid_bills': 0,
+                'paid_amount': 0,
+                'unpaid_amount': 0
+            }
+        
+        monthly_billing[month_key]['total_bills'] += 1
+        monthly_billing[month_key]['total_amount'] += bill.amount
+        
+        if bill.is_paid:
+            monthly_billing[month_key]['paid_bills'] += 1
+            monthly_billing[month_key]['paid_amount'] += bill.amount
+        else:
+            monthly_billing[month_key]['unpaid_bills'] += 1
+            monthly_billing[month_key]['unpaid_amount'] += bill.amount
+    
+    # Sort by month key (newest first)
+    sorted_months = sorted(monthly_billing.items(), key=lambda x: x[0], reverse=True)
+    
+    # Calculate student totals
+    total_bills = all_bills.count()
+    total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+    paid_bills = all_bills.filter(is_paid=True).count()
+    unpaid_bills = all_bills.filter(is_paid=False).count()
+    paid_amount = all_bills.filter(is_paid=True).aggregate(total=models.Sum('amount'))['total'] or 0
+    unpaid_amount = all_bills.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+    
+    context = {
+        'student': student,
+        'monthly_billing': sorted_months,
+        'total_bills': total_bills,
+        'total_amount': total_amount,
+        'paid_bills': paid_bills,
+        'unpaid_bills': unpaid_bills,
+        'paid_amount': paid_amount,
+        'unpaid_amount': unpaid_amount,
+    }
+    return render(request, 'student_months.html', context)
 
 @login_required
 def payer_profile_view(request):
@@ -1051,12 +1405,8 @@ def payer_profile_view(request):
                 request.session['force_password_change'] = False
                 messages.success(request, 'Password changed successfully!')
                 login(request, user)
-            # Check required fields
-            if user.phone_number and user.address:
-                request.session['force_password_change'] = False
-                messages.success(request, 'Profile updated successfully!')
-            else:
-                messages.warning(request, 'Please complete your address and phone number to continue.')
+            request.session['force_password_change'] = False
+            messages.success(request, 'Profile updated successfully!')
             return redirect('payer_profile')
     else:
         form = PayerProfileForm(instance=request.user)
@@ -1082,9 +1432,6 @@ Requested Changes:
 First Name: {cleaned_data.get('first_name')}
 Last Name: {cleaned_data.get('last_name')}
 Email: {cleaned_data.get('email')}
-Phone Number: {cleaned_data.get('phone_number')}
-Address: {cleaned_data.get('address')}
-Contact Info: {cleaned_data.get('contact_info')}
 
 Please review and apply changes manually if appropriate.
     """
@@ -1196,19 +1543,17 @@ def add_payment_method(request):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('payer_login')
     
-    # Check if user has completed their profile
-    if not request.user.phone_number or not request.user.address:
-        messages.warning(request, 'Please complete your profile before adding payment methods.')
-        return redirect('profile_completion')
-    
     stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
     # Get or create Stripe customer
     customer_id = get_or_create_stripe_customer(request.user)
-    # Create a SetupIntent for this customer
-    setup_intent = stripe.SetupIntent.create(customer=customer_id)
+    # Create a SetupIntent for this customer with support for both cards and bank accounts
+    setup_intent = stripe.SetupIntent.create(
+        customer=customer_id,
+        payment_method_types=['card', 'us_bank_account'],
+        usage='off_session'  # Allow future payments
+    )
     client_secret = setup_intent.client_secret
-    print('DEBUG STRIPE_PUBLISHABLE_KEY:', stripe_publishable_key)
-    print('DEBUG STRIPE_CLIENT_SECRET:', client_secret)
+    
     if request.method == 'POST':
         payment_method_id = request.POST.get('payment_method_id')
         nickname = request.POST.get('nickname')
@@ -1234,7 +1579,7 @@ def add_payment_method(request):
                     exp_year=exp_year,
                     stripe_payment_method_id=payment_method_id
                 )
-                messages.success(request, 'Card added successfully.')
+                messages.success(request, f'{brand} card ending in {last4} added successfully.')
             elif pm.type == 'us_bank_account':
                 bank = pm.us_bank_account
                 last4 = bank.last4
@@ -1247,7 +1592,7 @@ def add_payment_method(request):
                     provider_token='',  # Not used with Stripe
                     stripe_payment_method_id=payment_method_id
                 )
-                messages.success(request, 'Bank account added successfully.')
+                messages.success(request, f'Bank account ending in {last4} added successfully.')
             else:
                 messages.error(request, f'Unsupported payment method type: {pm.type}')
             return redirect('payer_dashboard')
@@ -1275,17 +1620,52 @@ def manage_billing(request):
     if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('home')
-    students = Student.objects.all()
-    # Calculate total amount owed for each student
+    
+    # Get all students with their billing summary
+    students = Student.objects.all().order_by('last_name', 'first_name')
     student_billing = []
+    
     for student in students:
-        total_owed = student.payment_breakdowns.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+        # Get all bills for this student
+        all_bills = student.payment_breakdowns.filter(due_date__isnull=False)
+        
+        # Calculate totals
+        total_bills = all_bills.count()
+        total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+        paid_bills = all_bills.filter(is_paid=True).count()
+        unpaid_bills = all_bills.filter(is_paid=False).count()
+        paid_amount = all_bills.filter(is_paid=True).aggregate(total=models.Sum('amount'))['total'] or 0
+        unpaid_amount = all_bills.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+        
+        # Get unique months for this student
+        months = all_bills.dates('due_date', 'month', order='DESC')
+        
         student_billing.append({
             'student': student,
-            'total_owed': total_owed,
+            'total_bills': total_bills,
+            'total_amount': total_amount,
+            'paid_bills': paid_bills,
+            'unpaid_bills': unpaid_bills,
+            'paid_amount': paid_amount,
+            'unpaid_amount': unpaid_amount,
+            'months_count': len(months),
+            'months': months
         })
+    
+    # Calculate overall statistics
+    total_students = len(student_billing)
+    total_all_bills = sum(s['total_bills'] for s in student_billing)
+    total_all_amount = sum(s['total_amount'] for s in student_billing)
+    total_all_paid = sum(s['paid_amount'] for s in student_billing)
+    total_all_unpaid = sum(s['unpaid_amount'] for s in student_billing)
+    
     context = {
         'student_billing': student_billing,
+        'total_students': total_students,
+        'total_all_bills': total_all_bills,
+        'total_all_amount': total_all_amount,
+        'total_all_paid': total_all_paid,
+        'total_all_unpaid': total_all_unpaid,
     }
     return render(request, 'manage_billing.html', context)
 
@@ -1328,80 +1708,43 @@ def student_bills(request, student_id):
     }
     return render(request, 'student_bills.html', context)
 
-@login_required
-def profile_completion(request):
-    if request.user.user_type != 'payer':
-        messages.error(request, 'Only payers can access this page.')
-        return redirect('payer_login')
-
-    if request.method == 'POST':
-        form = ProfileCompletionForm(request.POST, instance=request.user)
-        if form.is_valid():
-            user = form.save(commit=False)
-            
-            # Set the new password
-            new_password = form.cleaned_data.get('new_password1')
-            if new_password:
-                user.set_password(new_password)
-            
-            user.save()
-            
-            # Re-authenticate the user with the new password
-            login(request, user)
-            
-            messages.success(request, 'Profile completed successfully! You can now access your dashboard.')
-            return redirect('payer_dashboard')
-    else:
-        form = ProfileCompletionForm(instance=request.user)
-
-    return render(request, 'profile_completion.html', {'form': form})
-
-@login_required
-def inline_edit_student_field(request):
-    """Handle inline editing of student fields via AJAX"""
-    if request.user.user_type != 'admin':
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-    
-    if request.method == 'POST':
-        student_id = request.POST.get('student_id')
-        field_name = request.POST.get('field_name')
-        field_value = request.POST.get('field_value')
+def reset_password(request, token):
+    try:
+        # Find the password reset record
+        password_reset = PasswordReset.objects.get(token=token, used=False)
         
-        try:
-            student = get_object_or_404(Student, id=student_id)
+        # Check if token is expired
+        if password_reset.is_expired():
+            messages.error(request, 'Password reset link has expired. Please request a new one.')
+            return redirect('forgot_password')
+        
+        if request.method == 'POST':
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
             
-            # Validate field name
-            allowed_fields = ['first_name', 'last_name', 'grade', 'status', 'notes', 'date_of_birth']
-            if field_name not in allowed_fields:
-                return JsonResponse({'error': 'Invalid field'}, status=400)
-            
-            # Set the field value
-            setattr(student, field_name, field_value)
-            student.save()
-            
-            # Return the formatted value for display
-            if field_name == 'status':
-                display_value = student.get_status_display()
-            elif field_name == 'grade':
-                display_value = f"Grade {field_value}"
-            elif field_name == 'notes':
-                display_value = field_value if field_value else "No notes added yet."
-            elif field_name == 'date_of_birth':
-                try:
-                    date_obj = datetime.strptime(field_value, '%Y-%m-%d').date()
-                    display_value = date_obj.strftime('%b %d, %Y')
-                except:
-                    display_value = field_value
+            if new_password != confirm_password:
+                messages.error(request, 'Passwords do not match.')
+            elif len(new_password) < 8:
+                messages.error(request, 'Password must be at least 8 characters long.')
             else:
-                display_value = field_value
+                # Set new password
+                user = password_reset.user
+                user.set_password(new_password)
+                user.save()
                 
-            return JsonResponse({
-                'success': True,
-                'display_value': display_value,
-                'message': f'{field_name.replace("_", " ").title()} updated successfully'
-            })
-            
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+                # Mark token as used
+                password_reset.used = True
+                password_reset.save()
+                
+                messages.success(request, 'Password has been reset successfully. You can now log in with your new password.')
+                return redirect('payer_login')
+        
+        return render(request, 'reset_password.html', {'token': token})
+        
+    except PasswordReset.DoesNotExist:
+        messages.error(request, 'Invalid or expired password reset link.')
+        return redirect('forgot_password')
+    except Exception as e:
+        messages.error(request, f'Error resetting password: {str(e)}')
+        return redirect('forgot_password')
+

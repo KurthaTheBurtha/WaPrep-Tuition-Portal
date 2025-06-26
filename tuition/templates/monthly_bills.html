@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">{{ student.first_name }} {{ student.last_name }} - {{ month_display }}</h4>
+                    <p class="text-muted mb-0">{{ student.student_id }} • {{ first_day|date:"M d" }} - {{ last_day|date:"M d, Y" }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'student_months' student_id=student.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Months
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row mb-4 g-3">
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-file-invoice-dollar text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Bills</h6>
+                            <h2 class="card-title mb-0">{{ total_bills }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Paid Amount</h6>
+                            <h2 class="card-title mb-0">${{ paid_amount|floatformat:0 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-exclamation-triangle text-warning fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Unpaid Amount</h6>
+                            <h2 class="card-title mb-0">${{ unpaid_amount|floatformat:0 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-dollar-sign text-info fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Amount</h6>
+                            <h2 class="card-title mb-0">${{ total_amount|floatformat:0 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Bill Button -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal" id="addBillBtn">
+                <i class="fas fa-plus me-1"></i> Add Bill for {{ month_display }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Bills List -->
+    <div class="row">
+        <div class="col-12">
+            {% if bills %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Bills for {{ month_display }}
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="border-0 ps-4">Description</th>
+                                        <th class="border-0">Due Date</th>
+                                        <th class="border-0 text-end">Amount</th>
+                                        <th class="border-0 text-center">Status</th>
+                                        <th class="border-0 text-end pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bill in bills %}
+                                    <tr>
+                                        <td class="ps-4">{{ bill.description }}</td>
+                                        <td>{{ bill.due_date|date:"M d, Y" }}</td>
+                                        <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
+                                        <td class="text-center">
+                                            {% if bill.is_paid %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Unpaid</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <form method="post" style="display: inline;">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="remove">
+                                                <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                        onclick="return confirm('Are you sure you want to remove this bill?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <div class="text-muted">
+                            <div class="mb-3">
+                                <i class="fas fa-calendar-times fa-3x"></i>
+                            </div>
+                            <h5>No Bills for {{ month_display }}</h5>
+                            <p class="mb-3">No bills have been created for {{ student.first_name }} {{ student.last_name }} in {{ month_display }} yet.</p>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBillModal">
+                                <i class="fas fa-plus me-1"></i> Add First Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add Bill Modal -->
+<div class="modal fade" id="addBillModal" tabindex="-1" aria-labelledby="addBillModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addBillModalLabel">Add Bill for {{ student.first_name }} {{ student.last_name }} - {{ month_display }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="addBillForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" name="description" id="description" class="form-control" required 
+                               placeholder="e.g., Tuition Payment, Activity Fee">
+                    </div>
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0" required 
+                                   placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="due_date" class="form-label">Due Date</label>
+                        <input type="date" name="due_date" id="due_date" class="form-control" 
+                               min="{{ first_day|date:'Y-m-d' }}" max="{{ last_day|date:'Y-m-d' }}" required>
+                        <div class="form-text">Must be within {{ month_display }}</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBillBtn">
+                        <i class="fas fa-plus me-1"></i> Add Bill
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Ensure modal has proper z-index and backdrop */
+.modal {
+    z-index: 1055 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.modal-dialog {
+    z-index: 1056 !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up modal...');
+    
+    // Set default due date to first day of month
+    const dueDateInput = document.getElementById('due_date');
+    if (dueDateInput) {
+        dueDateInput.value = '{{ first_day|date:"Y-m-d" }}';
+        console.log('Set default due date:', dueDateInput.value);
+    }
+    
+    // Test modal functionality
+    const addBillBtn = document.getElementById('addBillBtn');
+    const modal = document.getElementById('addBillModal');
+    
+    if (addBillBtn) {
+        console.log('Add bill button found');
+        addBillBtn.addEventListener('click', function() {
+            console.log('Add bill button clicked');
+        });
+    }
+    
+    if (modal) {
+        console.log('Modal found');
+        
+        // Listen for modal events
+        modal.addEventListener('show.bs.modal', function() {
+            console.log('Modal showing...');
+        });
+        
+        modal.addEventListener('shown.bs.modal', function() {
+            console.log('Modal shown');
+            // Focus on the first input
+            const firstInput = modal.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        });
+        
+        modal.addEventListener('hide.bs.modal', function() {
+            console.log('Modal hiding...');
+        });
+        
+        modal.addEventListener('hidden.bs.modal', function() {
+            console.log('Modal hidden');
+            // Clean up any remaining backdrop
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(b => b.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        });
+    }
+    
+    // Handle form submission
+    const addBillForm = document.getElementById('addBillForm');
+    const submitBtn = document.getElementById('submitBillBtn');
+    
+    if (addBillForm) {
+        console.log('Form found');
+        addBillForm.addEventListener('submit', function(e) {
+            console.log('Form submitted');
+            
+            // Validate form
+            const description = document.getElementById('description').value.trim();
+            const amount = document.getElementById('amount').value;
+            const dueDate = document.getElementById('due_date').value;
+            
+            console.log('Form data:', { description, amount, dueDate });
+            
+            if (!description || !amount || !dueDate) {
+                e.preventDefault();
+                alert('Please fill in all required fields.');
+                return false;
+            }
+            
+            if (parseFloat(amount) <= 0) {
+                e.preventDefault();
+                alert('Amount must be greater than 0.');
+                return false;
+            }
+            
+            // Disable submit button to prevent double submission
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Adding...';
+            console.log('Form validation passed, submitting...');
+        });
+    }
+    
+    // Reset form when modal is closed
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function() {
+            if (addBillForm) {
+                addBillForm.reset();
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-plus me-1"></i> Add Bill';
+            }
+            console.log('Modal closed, form reset');
+        });
+    }
+    
+    // Test Bootstrap modal functionality
+    if (typeof bootstrap !== 'undefined') {
+        console.log('Bootstrap is loaded');
+        const testModal = new bootstrap.Modal(modal, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+        console.log('Modal instance created:', testModal);
+    } else {
+        console.error('Bootstrap is not loaded!');
+    }
+    
+    // Emergency cleanup function
+    window.cleanupModal = function() {
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        console.log('Emergency modal cleanup performed');
+    };
+});
+</script>
+{% endblock %} 
