@@ -1,5 +1,6 @@
 from django import forms
 from .models import AccountRequest, User, BankAccount
+from .utils import validate_password, get_password_strength
 
 class AccountRequestForm(forms.ModelForm):
     class Meta:
@@ -61,12 +62,20 @@ class BankAccountPaymentForm(forms.Form):
 class ProfileCompletionForm(forms.Form):
     new_password1 = forms.CharField(
         label='New Password',
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        help_text='Enter your new password'
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'id': 'new_password1',
+            'placeholder': 'Enter your new password'
+        }),
+        help_text='Password must be at least 8 characters with uppercase, lowercase, number, and special character (!@#$%^&*)'
     )
     new_password2 = forms.CharField(
         label='Confirm New Password',
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'id': 'new_password2',
+            'placeholder': 'Confirm your new password'
+        }),
         help_text='Enter the same password as above, for verification'
     )
 
@@ -74,11 +83,16 @@ class ProfileCompletionForm(forms.Form):
         cleaned_data = super().clean()
         new_password1 = cleaned_data.get('new_password1')
         new_password2 = cleaned_data.get('new_password2')
+        
         if new_password1 and new_password2:
             if new_password1 != new_password2:
                 raise forms.ValidationError("The two password fields didn't match.")
-            if len(new_password1) < 8:
-                raise forms.ValidationError("Password must be at least 8 characters long.")
+            
+            # Use the new password validation
+            is_valid, message = validate_password(new_password1)
+            if not is_valid:
+                raise forms.ValidationError(message)
+        
         return cleaned_data
 
 class PayerProfileForm(forms.ModelForm):
@@ -90,3 +104,4 @@ class EditPayerProfileForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']
+

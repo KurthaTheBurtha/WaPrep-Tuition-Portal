@@ -27,6 +27,7 @@ from reportlab.pdfgen import canvas
 from io import BytesIO
 from django.views.decorators.http import require_POST
 from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
+from .utils import validate_password, generate_strong_password
 from decimal import Decimal
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -57,25 +58,7 @@ def payer_login(request):
             messages.error(request, 'Invalid User ID or password for payer account.')
     return render(request, 'payer_login.html', {'hide_nav_items': True})
 
-def payer_signup(request):
-    if request.method == 'POST':
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
 
-        if User.objects.filter(email=email).exists():
-            messages.error(request, "An account with this email already exists.")
-        else:
-            user = User.objects.create_user(username=email, first_name=first_name, last_name=last_name, email=email, password=password)
-            user.user_type = 'payer'
-            user.save()
-            login(request, user)
-            messages.success(request, "Account created successfully.")
-            return redirect('payer_dashboard')
-
-    return render(request, 'payer_signup.html')
 
 def admin_login(request):
     if request.method == 'POST':
@@ -720,41 +703,43 @@ def update_student(request):
 
 def generate_unique_user_id(first_name, last_name):
     """
-    Generate a unique user ID based on first and last name.
-    Format: First letter of first name + first letter of last name + last 4 digits of last name + random 3 digits
-    Example: John Smith -> JSith123
+    Generate a unique 8-character user ID with numbers and special characters.
+    Format: 8 characters including letters, numbers, and special characters
+    Example: K8#mN2$p
     """
-    # Clean and normalize names
-    first_name = first_name.strip().upper()
-    last_name = last_name.strip().upper()
+    # Define character sets
+    letters = string.ascii_letters  # a-z, A-Z
+    digits = string.digits  # 0-9
+    special_chars = "!@#$%^&*"  # Special characters (avoiding problematic ones)
     
-    # Get first letter of first name
-    first_initial = first_name[0] if first_name else 'X'
+    # Combine all character sets
+    all_chars = letters + digits + special_chars
     
-    # Get first letter of last name
-    last_initial = last_name[0] if last_name else 'X'
+    # Generate unique 8-character user ID
+    max_attempts = 1000  # Prevent infinite loop
+    attempts = 0
     
-    # Get last 4 characters of last name (or pad with X if shorter)
-    last_part = last_name[-4:] if len(last_name) >= 4 else last_name.ljust(4, 'X')
-    
-    # Generate base user ID
-    base_user_id = f"{first_initial}{last_initial}{last_part}"
-    
-    # Add random 3 digits to ensure uniqueness
-    counter = 1
-    while True:
-        if counter == 1:
-            user_id = base_user_id
-        else:
-            user_id = f"{base_user_id}{counter:03d}"
+    while attempts < max_attempts:
+        # Generate 8-character ID with at least one letter, one number, and one special character
+        user_id = ''.join(random.choices(all_chars, k=8))
         
+        # Ensure it contains at least one letter, one number, and one special character
+        has_letter = any(c in letters for c in user_id)
+        has_digit = any(c in digits for c in user_id)
+        has_special = any(c in special_chars for c in user_id)
+        
+        if has_letter and has_digit and has_special:
+            # Check if this user_id already exists
+            if not User.objects.filter(user_id=user_id).exists():
+                return user_id
+        
+        attempts += 1
+    
+    # Fallback: if we can't generate a unique ID with the pattern, use a simpler approach
+    while True:
+        user_id = 'P' + ''.join(random.choices(string.ascii_uppercase + string.digits + "!@#$%^&*", k=7))
         if not User.objects.filter(user_id=user_id).exists():
             return user_id
-        
-        counter += 1
-        if counter > 999:  # Prevent infinite loop
-            # Fallback to original random method
-            return 'P' + ''.join(random.choices(string.digits, k=7))
 
 @login_required
 def add_payer_to_student(request):
@@ -927,28 +912,31 @@ def activation_setup(request):
             
             if new_password != confirm_password:
                 messages.error(request, 'Passwords do not match.')
-            elif len(new_password) < 8:
-                messages.error(request, 'Password must be at least 8 characters long.')
             else:
-                try:
-                    # Set new password and activate account
-                    user.set_password(new_password)
-                    user.is_active = True
-                    user.save()
-                    
-                    # Clear activation session before logging in
-                    if 'activation_user_id' in request.session:
-                        del request.session['activation_user_id']
-                    if 'activation_temp_password' in request.session:
-                        del request.session['activation_temp_password']
-                    
-                    # Log the user in
-                    login(request, user)
-                    
-                    messages.success(request, 'Account activated successfully! Welcome to your dashboard.')
-                    return redirect('payer_dashboard')
-                except Exception as e:
-                    messages.error(request, f'Error saving password: {str(e)}')
+                # Use the new password validation
+                is_valid, message = validate_password(new_password)
+                if not is_valid:
+                    messages.error(request, message)
+                else:
+                    try:
+                        # Set new password and activate account
+                        user.set_password(new_password)
+                        user.is_active = True
+                        user.save()
+                        
+                        # Clear activation session before logging in
+                        if 'activation_user_id' in request.session:
+                            del request.session['activation_user_id']
+                        if 'activation_temp_password' in request.session:
+                            del request.session['activation_temp_password']
+                        
+                        # Log the user in
+                        login(request, user)
+                        
+                        messages.success(request, 'Account activated successfully with secure password! Welcome to your dashboard.')
+                        return redirect('payer_dashboard')
+                    except Exception as e:
+                        messages.error(request, f'Error saving password: {str(e)}')
         
         return render(request, 'activation_setup.html', {'user': user})
         
@@ -1199,7 +1187,7 @@ def profile_completion(request):
             # Re-authenticate the user with the new password
             login(request, request.user)
             
-            messages.success(request, 'Profile completed successfully! You can now access your dashboard.')
+            messages.success(request, 'Profile completed successfully with secure password! You can now access your dashboard.')
             return redirect('payer_dashboard')
     else:
         form = ProfileCompletionForm()
@@ -1433,13 +1421,19 @@ def payer_profile_view(request):
         form = PayerProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             user = form.save()
-            # If password is being changed, clear the force flag
+            # If password is being changed, validate and clear the force flag
             new_password = request.POST.get('new_password')
             if new_password:
+                # Use the new password validation
+                is_valid, message = validate_password(new_password)
+                if not is_valid:
+                    messages.error(request, message)
+                    return render(request, 'payer_profile.html', {'form': form, 'force_change': force_change})
+                
                 user.set_password(new_password)
                 user.save()
                 request.session['force_password_change'] = False
-                messages.success(request, 'Password changed successfully!')
+                messages.success(request, 'Password changed successfully with secure password!')
                 login(request, user)
             request.session['force_password_change'] = False
             messages.success(request, 'Profile updated successfully!')
@@ -1778,20 +1772,23 @@ def reset_password(request, token):
             
             if new_password != confirm_password:
                 messages.error(request, 'Passwords do not match.')
-            elif len(new_password) < 8:
-                messages.error(request, 'Password must be at least 8 characters long.')
             else:
-                # Set new password
-                user = password_reset.user
-                user.set_password(new_password)
-                user.save()
-                
-                # Mark token as used
-                password_reset.used = True
-                password_reset.save()
-                
-                messages.success(request, 'Password has been reset successfully. You can now log in with your new password.')
-                return redirect('payer_login')
+                # Use the new password validation
+                is_valid, message = validate_password(new_password)
+                if not is_valid:
+                    messages.error(request, message)
+                else:
+                    # Set new password
+                    user = password_reset.user
+                    user.set_password(new_password)
+                    user.save()
+                    
+                    # Mark token as used
+                    password_reset.used = True
+                    password_reset.save()
+                    
+                    messages.success(request, 'Password has been reset successfully with secure password. You can now log in with your new password.')
+                    return redirect('payer_login')
         
         return render(request, 'reset_password.html', {'token': token})
         
