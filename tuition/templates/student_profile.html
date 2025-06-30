@@ -92,6 +92,7 @@
                                         <span class="badge bg-warning text-dark ms-2 align-middle">Pending Activation</span>
                                     {% endif %}
                                 </strong><br>
+                                <small class="text-muted">ID: {{ sp.payer.user_id }}</small><br>
                                 <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %} (Primary){% endif %}</small><br>
                                 <small class="text-muted">{{ sp.payer.email }}</small>
                             </div>
@@ -147,7 +148,7 @@
                         <select class="form-select" name="payer_id" id="payer_id" onchange="toggleNewPayerFields()">
                             <option value="">-- Add New Payer --</option>
                             {% for payer in payers %}
-                                <option value="{{ payer.id }}">{{ payer.get_full_name }} ({{ payer.email }})</option>
+                                <option value="{{ payer.id }}">{{ payer.get_full_name }} (ID: {{ payer.user_id }}) - {{ payer.email }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -188,17 +189,23 @@
 function toggleNewPayerFields() {
     var payerSelect = document.getElementById('payer_id');
     var newPayerFields = document.getElementById('new-payer-fields');
+    var relationshipSelect = document.getElementById('relationship');
+    
     if (payerSelect.value) {
         newPayerFields.style.display = 'none';
         // Remove required from new payer fields
         document.getElementById('first_name').required = false;
         document.getElementById('last_name').required = false;
         document.getElementById('email').required = false;
+        // Relationship is always required
+        relationshipSelect.required = true;
     } else {
         newPayerFields.style.display = 'block';
         document.getElementById('first_name').required = true;
         document.getElementById('last_name').required = true;
         document.getElementById('email').required = true;
+        // Relationship is always required
+        relationshipSelect.required = true;
     }
 }
 

@@ -765,6 +765,7 @@ def add_payer_to_student(request):
     
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
+        payer_id = request.POST.get('payer_id')  # For existing payer selection
         first_name = request.POST.get('first_name')
         last_name = request.POST.get('last_name')
         email = request.POST.get('email')
@@ -774,28 +775,45 @@ def add_payer_to_student(request):
         try:
             student = get_object_or_404(Student, id=student_id)
             
-            # Check if user already exists
-            if User.objects.filter(email=email).exists():
-                payer = User.objects.get(email=email)
+            # Handle existing payer selection
+            if payer_id:
+                payer = get_object_or_404(User, id=payer_id)
                 if payer.user_type != 'payer':
-                    messages.error(request, f'User with email {email} exists but is not a payer.')
+                    messages.error(request, f'Selected user is not a payer.')
                     return redirect('student_profile', student_id=student_id)
             else:
-                # Create new user with temporary password
-                import secrets
-                temp_password = secrets.token_urlsafe(12)
-                user_id = generate_unique_user_id(first_name, last_name)
-                payer = User.objects.create_user(
-                    username=user_id,  # Set username to user_id for login
-                    first_name=first_name,
-                    last_name=last_name,
-                    email=email,
-                    password=temp_password,
-                    user_type='payer',
-                    user_id=user_id,
-                    is_active=False
-                )
-                # Note: Activation email will be sent manually via admin interface
+                # Handle new payer creation
+                if not email or not first_name or not last_name:
+                    messages.error(request, 'Please provide all required information for new payer.')
+                    return redirect('student_profile', student_id=student_id)
+                
+                # Check if user already exists by email
+                if User.objects.filter(email=email).exists():
+                    payer = User.objects.get(email=email)
+                    if payer.user_type != 'payer':
+                        messages.error(request, f'User with email {email} exists but is not a payer.')
+                        return redirect('student_profile', student_id=student_id)
+                else:
+                    # Create new user with temporary password
+                    import secrets
+                    temp_password = secrets.token_urlsafe(12)
+                    user_id = generate_unique_user_id(first_name, last_name)
+                    payer = User.objects.create_user(
+                        username=user_id,  # Set username to user_id for login
+                        first_name=first_name,
+                        last_name=last_name,
+                        email=email,
+                        password=temp_password,
+                        user_type='payer',
+                        user_id=user_id,
+                        is_active=False
+                    )
+                    # Note: Activation email will be sent manually via admin interface
+            
+            # Validate relationship is provided
+            if not relationship:
+                messages.error(request, 'Please select a relationship.')
+                return redirect('student_profile', student_id=student_id)
             
             # If this is set as primary, unset any existing primary payer
             if is_primary:
@@ -1298,6 +1316,24 @@ def monthly_bills(request, student_id, month_key):
                 messages.success(request, 'Bill added successfully.')
             except Exception as e:
                 messages.error(request, f'Error adding bill: {str(e)}')
+        elif action == 'edit':
+            bill_id = request.POST.get('bill_id')
+            description = request.POST.get('description')
+            amount = request.POST.get('amount')
+            due_date = request.POST.get('due_date')
+            is_paid = request.POST.get('is_paid') == 'on'
+            try:
+                bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                bill.description = description
+                bill.amount = amount
+                bill.due_date = due_date
+                bill.is_paid = is_paid
+                bill.save()
+                messages.success(request, 'Bill updated successfully.')
+            except PaymentBreakdown.DoesNotExist:
+                messages.error(request, 'Bill not found.')
+            except Exception as e:
+                messages.error(request, f'Error updating bill: {str(e)}')
         elif action == 'remove':
             bill_id = request.POST.get('bill_id')
             try:
@@ -1364,8 +1400,8 @@ def student_months(request, student_id):
             monthly_billing[month_key]['unpaid_bills'] += 1
             monthly_billing[month_key]['unpaid_amount'] += bill.amount
     
-    # Sort by month key (newest first)
-    sorted_months = sorted(monthly_billing.items(), key=lambda x: x[0], reverse=True)
+    # Sort by month key (earliest first)
+    sorted_months = sorted(monthly_billing.items(), key=lambda x: x[0], reverse=False)
     
     # Calculate student totals
     total_bills = all_bills.count()
@@ -1693,10 +1729,28 @@ def student_bills(request, student_id):
                 messages.success(request, 'Bill added successfully.')
             except Exception as e:
                 messages.error(request, f'Error adding bill: {str(e)}')
+        elif action == 'edit':
+            bill_id = request.POST.get('bill_id')
+            description = request.POST.get('description')
+            amount = request.POST.get('amount')
+            due_date = request.POST.get('due_date')
+            is_paid = request.POST.get('is_paid') == 'on'
+            try:
+                bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                bill.description = description
+                bill.amount = amount
+                bill.due_date = due_date
+                bill.is_paid = is_paid
+                bill.save()
+                messages.success(request, 'Bill updated successfully.')
+            except PaymentBreakdown.DoesNotExist:
+                messages.error(request, 'Bill not found.')
+            except Exception as e:
+                messages.error(request, f'Error updating bill: {str(e)}')
         elif action == 'remove':
             bill_id = request.POST.get('bill_id')
             try:
-                bill = PaymentBreakdown.objects.get(id=bill_id)
+                bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
                 bill.delete()
                 messages.success(request, 'Bill removed successfully.')
             except Exception as e:

@@ -9,9 +9,16 @@ class AccountRequestForm(forms.ModelForm):
             'student_names': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
-                'placeholder': 'Enter the names of all students you are responsible for (e.g., John Smith, Jane Smith)'
+                'placeholder': 'Enter the names of all students you are responsible for (e.g., John Smith, Jane Smith)',
+                'required': True
             })
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields required
+        for field_name in self.fields:
+            self.fields[field_name].required = True
 
 class QuestionForm(forms.Form):
     subject = forms.CharField(max_length=100)
