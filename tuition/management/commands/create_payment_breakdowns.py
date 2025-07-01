@@ -11,8 +11,9 @@ class Command(BaseCommand):
         # Get all students
         students = Student.objects.all()
         
-        # Get current month and year
-        now = timezone.now()
+        # Get current month and year using system datetime instead of Django timezone
+        # Django timezone.now() seems to be showing incorrect date
+        now = datetime.now()
         current_month = now.month
         current_year = now.year
         
@@ -28,7 +29,7 @@ class Command(BaseCommand):
                 
                 # Get last day of the month
                 last_day = calendar.monthrange(year, month)[1]
-                due_date = timezone.make_aware(datetime(year, month, last_day))
+                due_date = datetime(year, month, last_day).date()
                 
                 # Create tuition payment
                 PaymentBreakdown.objects.create(

@@ -324,7 +324,7 @@ def download_receipt(request, payment_id):
     y = height - 50
     # Header
     p.setFont('Helvetica-Bold', 18)
-    p.drawString(50, y, 'Waprep Tuition Payment Receipt')
+    p.drawString(50, y, 'WAPrep Tuition Payment Receipt')
     y -= 30
     p.setFont('Helvetica', 12)
     p.drawString(50, y, f'Receipt #: {payment.receipt_number}')
@@ -467,11 +467,11 @@ def forgot_password(request):
             
             # Send reset email
             reset_url = request.build_absolute_uri(f'/reset-password/{token}/')
-            subject = 'WaPrep Tuition Portal - Password Reset'
+            subject = 'WAPrep Tuition Portal - Password Reset'
             message = f"""
 Hello {user.first_name},
 
-You have requested to reset your password for the WaPrep Tuition Portal.
+You have requested to reset your password for the WAPrep Tuition Portal.
 
 To reset your password, please click the following link:
 {reset_url}
@@ -504,6 +504,61 @@ WAPrep Administration
             return redirect('forgot_password')
     
     return render(request, 'forgot_password.html')
+
+def forgot_id(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        
+        try:
+            # Check if user exists with this email
+            user = User.objects.get(email=email)
+            
+            # Generate a new user ID
+            new_user_id = generate_unique_user_id(user.first_name, user.last_name)
+            
+            # Update the user's ID
+            user.user_id = new_user_id
+            user.save()
+            
+            # Send new user ID email
+            subject = 'WAPrep Tuition Portal - Your New User ID'
+            message = f"""
+Hello {user.first_name},
+
+You have requested a new user ID for the WAPrep Tuition Portal.
+
+Your new User ID is: {new_user_id}
+
+Please use this new ID to log in to your account. Your old ID is no longer valid.
+
+Please keep this information secure and do not share it with others.
+
+If you did not request this new ID, please contact us immediately.
+
+Best regards,
+WAPrep Administration
+            """.strip()
+            
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            
+            messages.success(request, 'Your new user ID has been sent to your email address.')
+            return redirect('payer_login')
+            
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not for security
+            messages.success(request, 'If an account with that email exists, your new user ID has been sent.')
+            return redirect('payer_login')
+        except Exception as e:
+            messages.error(request, f'Error generating new user ID: {str(e)}')
+            return redirect('forgot_password')
+    
+    return redirect('forgot_password')
 
 @login_required
 def students(request):
@@ -840,7 +895,7 @@ def send_activation_email(request, student_payer_id):
         
         # Send activation email
         activation_url = request.build_absolute_uri(f'/activate-account/{payer.id}/{temp_password}/')
-        subject = 'WaPrep Tuition Portal - Account Activation'
+        subject = 'WAPrep Tuition Portal - Account Activation'
         message = f"""
 Hello {payer.first_name},
 
@@ -979,7 +1034,8 @@ def admin_reports(request):
         return redirect('admin_login')
     
     # Get the selected year from query parameters, default to current year
-    selected_year = request.GET.get('year', timezone.now().year)
+    from datetime import datetime
+    selected_year = request.GET.get('year', datetime.now().year)
     
     # Get all payments for the selected year
     payments = Payment.objects.filter(
@@ -1004,8 +1060,8 @@ def admin_reports(request):
     if first_payment:
         start_year = first_payment.payment_date.year
     else:
-        start_year = timezone.now().year
-    end_year = timezone.now().year
+        start_year = datetime.now().year
+    end_year = datetime.now().year
     available_years = range(start_year, end_year + 1)
     
     context = {
@@ -1027,8 +1083,10 @@ def payer_dashboard(request):
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
 
-    # Get current month and year
-    current_date = timezone.now()
+    # Get current month and year using system datetime instead of Django timezone
+    # Django timezone.now() seems to be showing incorrect date
+    from datetime import datetime
+    current_date = datetime.now()
     current_month = current_date.month
     current_year = current_date.year
     today = current_date.date()
