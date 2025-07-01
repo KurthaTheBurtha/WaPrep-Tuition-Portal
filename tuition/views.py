@@ -1644,7 +1644,6 @@ def add_payment_method(request):
     
     if request.method == 'POST':
         payment_method_id = request.POST.get('payment_method_id')
-        nickname = request.POST.get('nickname')
         try:
             # Retrieve the PaymentMethod from Stripe
             pm = stripe.PaymentMethod.retrieve(payment_method_id)
@@ -1660,7 +1659,7 @@ def add_payment_method(request):
                 exp_year = card.exp_year
                 Card.objects.create(
                     user=request.user,
-                    nickname=nickname or f'{brand} ****{last4}',
+                    nickname=f'{brand} ****{last4}',
                     last4=last4,
                     brand=brand,
                     exp_month=exp_month,
@@ -1674,13 +1673,13 @@ def add_payment_method(request):
                 account_type = bank.account_type
                 BankAccount.objects.create(
                     user=request.user,
-                    nickname=nickname or f'Bank ****{last4}',
+                    nickname=f'{account_type.title()} ****{last4}',
                     account_type=account_type,
                     last4=last4,
                     provider_token='',  # Not used with Stripe
                     stripe_payment_method_id=payment_method_id
                 )
-                messages.success(request, f'Bank account ending in {last4} added successfully.')
+                messages.success(request, f'{account_type.title()} account ending in {last4} added successfully.')
             else:
                 messages.error(request, f'Unsupported payment method type: {pm.type}')
             return redirect('payer_dashboard')

@@ -16,12 +16,6 @@
 
             <form id="payment-method-form" method="post" action="{% url 'add_payment_method' %}">
                 {% csrf_token %}
-                <div class="mb-3" id="nickname_group">
-                    <label for="nickname" class="form-label">Payment Method Nickname</label>
-                    <input type="text" class="form-control" id="nickname" name="nickname" 
-                           placeholder="e.g., My Checking Account or Visa Card">
-                    <div class="form-text">Give this payment method a nickname for easy identification</div>
-                </div>
                 <div class="mb-3">
                     <label class="form-label">Payment Details</label>
                     <div id="payment-element" class="form-control"></div>
@@ -85,15 +79,9 @@ document.getElementById('payment-method-form').addEventListener('submit', async 
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     
     try {
-        const nickname = document.getElementById('nickname').value;
         const {setupIntent, error} = await stripe.confirmSetup({
             elements,
             confirmParams: {
-                payment_method_data: {
-                    billing_details: { 
-                        name: nickname || 'Payment Method'
-                    }
-                },
                 return_url: window.location.origin + "{% url 'payer_dashboard' %}"
             },
             redirect: 'if_required'
