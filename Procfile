@@ -1,0 +1,1 @@
+web: gunicorn tuition.wsgi --log-file - 

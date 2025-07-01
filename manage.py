@@ -6,7 +6,11 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tuition.settings')
+    # Use production settings if DJANGO_SETTINGS_MODULE is not set
+    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tuition.settings_production')
+    else:
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tuition.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
