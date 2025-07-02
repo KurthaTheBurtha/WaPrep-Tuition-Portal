@@ -48,4 +48,5 @@ urlpatterns = [
     path('activate-account/<int:user_id>/<str:temp_password>/', views.activate_account, name='activate_account'),
     path('activation-setup/', views.activation_setup, name='activation_setup'),
     path('inline-edit-student/', views.inline_edit_student_field, name='inline_edit_student_field'),
+    path('create-test-users/', views.create_test_user, name='create_test_user'),  # REMOVE IN PRODUCTION
 ]  

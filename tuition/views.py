@@ -1856,3 +1856,60 @@ def reset_password(request, token):
         messages.error(request, f'Error resetting password: {str(e)}')
         return redirect('forgot_password')
 
+def create_test_user(request):
+    """Simple view to create a test user - REMOVE IN PRODUCTION"""
+    if request.method == 'POST':
+        try:
+            # Create a test payer user
+            user_id = generate_unique_user_id("Test", "Payer")
+            user = User.objects.create_user(
+                username=user_id,
+                first_name="Test",
+                last_name="Payer",
+                email="test@example.com",
+                password="Test123!@#",
+                user_type='payer',
+                user_id=user_id,
+                is_active=True
+            )
+            
+            # Create a test admin user
+            admin_user = User.objects.create_user(
+                username="admin@waprep.org",
+                first_name="Admin",
+                last_name="User",
+                email="admin@waprep.org",
+                password="Admin123!@#",
+                user_type='admin',
+                user_id="admin@waprep.org",
+                is_active=True,
+                is_staff=True,
+                is_superuser=True
+            )
+            
+            return HttpResponse(f"""
+            <h2>Test Users Created Successfully!</h2>
+            <h3>Payer User:</h3>
+            <p>User ID: {user_id}</p>
+            <p>Email: test@example.com</p>
+            <p>Password: Test123!@#</p>
+            
+            <h3>Admin User:</h3>
+            <p>Email: admin@waprep.org</p>
+            <p>Password: Admin123!@#</p>
+            
+            <p><strong>⚠️ IMPORTANT: Delete this view after creating users!</strong></p>
+            """)
+            
+        except Exception as e:
+            return HttpResponse(f"Error creating users: {str(e)}")
+    
+    return HttpResponse("""
+    <h2>Create Test Users</h2>
+    <p>This will create test users for your application.</p>
+    <form method="post">
+        <button type="submit">Create Test Users</button>
+    </form>
+    <p><strong>⚠️ REMEMBER: Delete this view after creating users!</strong></p>
+    """)
+
