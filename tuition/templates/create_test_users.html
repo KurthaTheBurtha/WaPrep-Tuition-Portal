@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Create Test Users</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Warning:</strong> This will create test users for your application. 
+                Remember to delete this view after creating users!
+            </div>
+
+            <p>This will create the following test users:</p>
+            <ul>
+                <li><strong>Payer User:</strong> test@example.com</li>
+                <li><strong>Admin User:</strong> admin@waprep.org</li>
+            </ul>
+
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Test Users
+                </button>
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

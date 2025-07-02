@@ -1887,34 +1887,18 @@ def create_test_user(request):
                 is_superuser=True
             )
             
-            return HttpResponse(f"""
-            <h2>Test Users Created Successfully!</h2>
-            <h3>Payer User:</h3>
-            <p>User ID: {user_id}</p>
-            <p>Email: test@example.com</p>
-            <p>Password: Test123!@#</p>
-            
-            <h3>Admin User:</h3>
-            <p>Email: admin@waprep.org</p>
-            <p>Password: Admin123!@#</p>
-            
-            <p><strong>⚠️ IMPORTANT: Delete this view after creating users!</strong></p>
-            """)
+            return render(request, 'create_test_users_success.html', {
+                'payer_user_id': user_id,
+                'payer_email': 'test@example.com',
+                'payer_password': 'Test123!@#',
+                'admin_email': 'admin@waprep.org',
+                'admin_password': 'Admin123!@#'
+            })
             
         except Exception as e:
-            return HttpResponse(f"Error creating users: {str(e)}")
+            return render(request, 'create_test_users_error.html', {
+                'error': str(e)
+            })
     
-    # Get CSRF token
-    from django.template.context_processors import csrf
-    csrf_token = csrf(request)['csrf_token']
-    
-    return HttpResponse(f"""
-    <h2>Create Test Users</h2>
-    <p>This will create test users for your application.</p>
-    <form method="post">
-        <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
-        <button type="submit">Create Test Users</button>
-    </form>
-    <p><strong>⚠️ REMEMBER: Delete this view after creating users!</strong></p>
-    """)
+    return render(request, 'create_test_users.html')
 

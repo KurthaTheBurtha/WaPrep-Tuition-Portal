@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-check-circle"></i> Test Users Created Successfully!
+            </h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success">
+                <i class="fas fa-info-circle"></i>
+                <strong>Success:</strong> Test users have been created successfully.
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Payer User</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>User ID:</strong> {{ payer_user_id }}</p>
+                            <p><strong>Email:</strong> {{ payer_email }}</p>
+                            <p><strong>Password:</strong> {{ payer_password }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Admin User</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Email:</strong> {{ admin_email }}</p>
+                            <p><strong>Password:</strong> {{ admin_password }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Important:</strong> Please delete the create_test_user view from your code after using these credentials!
+            </div>
+
+            <div class="mt-3">
+                <a href="{% url 'payer_login' %}" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Go to Payer Login
+                </a>
+                <a href="{% url 'admin_login' %}" class="btn btn-secondary">
+                    <i class="fas fa-user-shield"></i> Go to Admin Login
+                </a>
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-home"></i> Go Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
