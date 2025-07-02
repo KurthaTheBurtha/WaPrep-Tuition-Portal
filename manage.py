@@ -6,10 +6,8 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    # Use production settings if DJANGO_SETTINGS_MODULE is not set
+    # Use development settings by default, production only if explicitly set
     if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tuition.settings_production')
-    else:
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tuition.settings')
     try:
         from django.core.management import execute_from_command_line
