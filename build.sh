@@ -9,6 +9,7 @@ echo "Collecting static files..."
 python manage.py collectstatic --no-input
 
 echo "Running database migrations..."
+export DJANGO_SETTINGS_MODULE=tuition.settings_production
 python manage.py migrate --noinput
 
 echo "Creating default admin user if it doesn't exist..."
