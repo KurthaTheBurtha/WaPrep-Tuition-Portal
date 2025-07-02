@@ -70,6 +70,8 @@ WSGI_APPLICATION = 'tuition.wsgi.application'
 
 # DATABASE - Use PostgreSQL in production, fallback to SQLite for testing
 DATABASE_URL = os.getenv('DATABASE_URL')
+print(f"DATABASE_URL: {DATABASE_URL}")  # Debug print
+
 if DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.config(
@@ -78,6 +80,7 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
+    print(f"Using PostgreSQL database: {DATABASES['default']['ENGINE']}")  # Debug print
 else:
     # Fallback to SQLite for testing
     DATABASES = {
@@ -86,6 +89,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    print("Using SQLite database (fallback)")  # Debug print
 
 # PASSWORD VALIDATION
 AUTH_PASSWORD_VALIDATORS = [
