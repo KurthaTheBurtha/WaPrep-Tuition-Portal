@@ -3,14 +3,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 
+# Add error handling for imports
+try:
+    import whitenoise
+except ImportError:
+    print("Warning: whitenoise not installed")
+
 # BASE DIRECTORY
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 
-# DEBUG SETTINGS - Always False in production
-DEBUG = False
+# DEBUG SETTINGS - Temporarily True for debugging
+DEBUG = True
 
 # ALLOWED HOSTS - Add your domain here
 ALLOWED_HOSTS = [
@@ -36,7 +42,6 @@ INSTALLED_APPS = [
 # MIDDLEWARE
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # For static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -44,6 +49,13 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Add whitenoise middleware conditionally
+try:
+    import whitenoise
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+except ImportError:
+    print("Warning: whitenoise not available, skipping static file middleware")
 
 # URL CONFIGURATION
 ROOT_URLCONF = 'tuition.urls'
@@ -125,8 +137,8 @@ if static_dir.exists():
 else:
     STATICFILES_DIRS = []
 
-# Static files storage
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Static files storage - use simple storage for now
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # DEFAULT PRIMARY KEY FIELD TYPE
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
