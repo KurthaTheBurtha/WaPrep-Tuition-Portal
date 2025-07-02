@@ -1904,10 +1904,15 @@ def create_test_user(request):
         except Exception as e:
             return HttpResponse(f"Error creating users: {str(e)}")
     
-    return HttpResponse("""
+    # Get CSRF token
+    from django.template.context_processors import csrf
+    csrf_token = csrf(request)['csrf_token']
+    
+    return HttpResponse(f"""
     <h2>Create Test Users</h2>
     <p>This will create test users for your application.</p>
     <form method="post">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
         <button type="submit">Create Test Users</button>
     </form>
     <p><strong>⚠️ REMEMBER: Delete this view after creating users!</strong></p>
