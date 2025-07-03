@@ -23,11 +23,14 @@
     </div>
 
     <div class="row">
-        <div class="col-12">
+        <!-- Unpaid Bills Column -->
+        <div class="col-12 col-lg-6">
             <div class="card shadow-sm">
                 <div class="card-header bg-white py-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Bills for {{ student.first_name }} {{ student.last_name }}</h5>
+                        <h5 class="mb-0 text-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Unpaid Bills
+                        </h5>
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBillModal">
                             <i class="fas fa-plus me-2"></i>Add Bill
                         </button>
@@ -51,12 +54,13 @@
                                     <th class="border-0 ps-4">Description</th>
                                     <th class="border-0">Amount</th>
                                     <th class="border-0">Due Date</th>
-                                    <th class="border-0">Status</th>
+                                    <th class="border-0">Show in History</th>
                                     <th class="border-0 text-end pe-4">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for bill in bills %}
+                                {% if not bill.is_paid %}
                                 <tr class="clickable-row" style="cursor: pointer;" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#editBillModal"
@@ -64,15 +68,16 @@
                                     data-bill-description="{{ bill.description }}"
                                     data-bill-amount="{{ bill.amount }}"
                                     data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
-                                    data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}">
+                                    data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                    data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
                                     <td class="ps-4">{{ bill.description }}</td>
                                     <td>${{ bill.amount|floatformat:2 }}</td>
                                     <td>{{ bill.due_date|date:'M d, Y' }}</td>
                                     <td>
-                                        {% if bill.is_paid %}
-                                            <span class="badge bg-success">Paid</span>
+                                        {% if bill.show_in_payment_history %}
+                                            <span class="badge bg-info">Yes</span>
                                         {% else %}
-                                            <span class="badge bg-danger">Unpaid</span>
+                                            <span class="badge bg-secondary">No</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end pe-4">
@@ -84,7 +89,8 @@
                                                 data-bill-description="{{ bill.description }}"
                                                 data-bill-amount="{{ bill.amount }}"
                                                 data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
-                                                data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}">
+                                                data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                                data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
                                             <i class="fas fa-edit me-1"></i> Edit
                                         </button>
                                         <form method="post" style="display:inline;" onclick="event.stopPropagation();">
@@ -97,6 +103,7 @@
                                         </form>
                                     </td>
                                 </tr>
+                                {% endif %}
                                 {% empty %}
                                 <tr>
                                     <td colspan="5" class="text-center py-5">
@@ -110,6 +117,121 @@
                                     </td>
                                 </tr>
                                 {% endfor %}
+                                {% if bills %}
+                                {% with unpaid_count=bills|length %}
+                                {% if unpaid_count == 0 %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="text-success">
+                                            <div class="mb-3">
+                                                <i class="fas fa-check-circle fa-3x"></i>
+                                            </div>
+                                            <h5>All Bills Paid!</h5>
+                                            <p class="mb-0">No unpaid bills for this student</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endwith %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paid Bills Column -->
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-success">
+                            <i class="fas fa-check-circle me-2"></i>Paid Bills
+                        </h5>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="border-0 ps-4">Description</th>
+                                    <th class="border-0">Amount</th>
+                                    <th class="border-0">Due Date</th>
+                                    <th class="border-0">Show in History</th>
+                                    <th class="border-0 text-end pe-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bill in bills %}
+                                {% if bill.is_paid %}
+                                <tr class="clickable-row" style="cursor: pointer;" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editBillModal"
+                                    data-bill-id="{{ bill.id }}"
+                                    data-bill-description="{{ bill.description }}"
+                                    data-bill-amount="{{ bill.amount }}"
+                                    data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
+                                    data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                    data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
+                                    <td class="ps-4">{{ bill.description }}</td>
+                                    <td>${{ bill.amount|floatformat:2 }}</td>
+                                    <td>{{ bill.due_date|date:'M d, Y' }}</td>
+                                    <td>
+                                        {% if bill.show_in_payment_history %}
+                                            <span class="badge bg-info">Yes</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-primary me-1" 
+                                                onclick="event.stopPropagation();"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editBillModal"
+                                                data-bill-id="{{ bill.id }}"
+                                                data-bill-description="{{ bill.description }}"
+                                                data-bill-amount="{{ bill.amount }}"
+                                                data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
+                                                data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                                data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
+                                            <i class="fas fa-edit me-1"></i> Edit
+                                        </button>
+                                        <form method="post" style="display:inline;" onclick="event.stopPropagation();">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="remove">
+                                            <input type="hidden" name="bill_id" value="{{ bill.id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove this bill?');">
+                                                <i class="fas fa-trash me-1"></i> Remove
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                                {% if bills %}
+                                {% with paid_count=0 %}
+                                {% for bill in bills %}
+                                    {% if bill.is_paid %}
+                                        {% with paid_count=paid_count|add:1 %}{% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if paid_count == 0 %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="text-muted">
+                                            <div class="mb-3">
+                                                <i class="fas fa-receipt fa-3x"></i>
+                                            </div>
+                                            <h5>No Paid Bills</h5>
+                                            <p class="mb-0">Paid bills will appear here</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endwith %}
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -149,6 +271,15 @@
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date</label>
                         <input type="date" class="form-control" name="due_date" id="due_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="show_in_payment_history" id="show_in_payment_history">
+                            <label class="form-check-label" for="show_in_payment_history">
+                                Show in Payment History (when paid)
+                            </label>
+                            <div class="form-text">If checked and this bill is marked as paid, it will appear in the payer's payment history</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -195,6 +326,15 @@
                             </label>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="show_in_payment_history" id="edit_show_in_payment_history">
+                            <label class="form-check-label" for="edit_show_in_payment_history">
+                                Show in Payment History (when paid)
+                            </label>
+                            <div class="form-text">If checked and this bill is marked as paid, it will appear in the payer's payment history</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -219,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const amount = button.getAttribute('data-bill-amount');
             const dueDate = button.getAttribute('data-bill-due-date');
             const isPaid = button.getAttribute('data-bill-is-paid') === 'true';
+            const showInHistory = button.getAttribute('data-bill-show-in-history') === 'true';
             
             // Populate the form fields
             document.getElementById('edit_bill_id').value = billId;
@@ -226,6 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('edit_amount').value = amount;
             document.getElementById('edit_due_date').value = dueDate;
             document.getElementById('edit_is_paid').checked = isPaid;
+            document.getElementById('edit_show_in_payment_history').checked = showInHistory;
         });
     }
 });

@@ -173,6 +173,10 @@ class PaymentBreakdown(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     due_date = models.DateField(null=True, blank=True)
     is_paid = models.BooleanField(default=False)
+    show_in_payment_history = models.BooleanField(
+        default=False, 
+        help_text="If checked and bill is paid, this will appear in the payer's payment history"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -221,3 +225,49 @@ class PasswordReset(models.Model):
         from django.utils import timezone
         from datetime import timedelta
         return self.created_at < timezone.now() - timedelta(hours=24)
+
+class PasswordHistory(models.Model):
+    """
+    Model to track password history and prevent password reuse.
+    Stores hashed passwords to prevent users from reusing recent passwords.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_history')
+    password_hash = models.CharField(max_length=255)  # Store the hashed password
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name_plural = "Password histories"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Password history for {self.user.email} at {self.created_at}"
+    
+    @classmethod
+    def store_password(cls, user, password):
+        """
+        Store a password hash in the user's password history.
+        """
+        from django.contrib.auth.hashers import make_password
+        password_hash = make_password(password)
+        cls.objects.create(user=user, password_hash=password_hash)
+        
+        # Keep only the last 5 passwords (delete older ones)
+        recent_passwords = cls.objects.filter(user=user).order_by('-created_at')[:5]
+        cls.objects.filter(user=user).exclude(id__in=recent_passwords.values_list('id', flat=True)).delete()
+    
+    @classmethod
+    def is_password_reused(cls, user, password):
+        """
+        Check if the password has been used recently by this user.
+        Returns True if the password is found in recent history.
+        """
+        from django.contrib.auth.hashers import check_password
+        
+        # Check against the last 5 passwords
+        recent_passwords = cls.objects.filter(user=user).order_by('-created_at')[:5]
+        
+        for password_record in recent_passwords:
+            if check_password(password, password_record.password_hash):
+                return True
+        
+        return False

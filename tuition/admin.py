@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     User, Student, StudentPayer, Payment, PaymentReceipt, PaymentReminder,
-    PaymentPlan, PaymentInstallment, AccountRequest, Vendor
+    PaymentPlan, PaymentInstallment, AccountRequest, Vendor, PasswordReset, PasswordHistory, PaymentBreakdown
 )
 
 @admin.register(User)
@@ -77,3 +77,52 @@ class AccountRequestAdmin(admin.ModelAdmin):
 @admin.register(Vendor)
 class VendorAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'bill_vendor_id')
+
+@admin.register(PasswordReset)
+class PasswordResetAdmin(admin.ModelAdmin):
+    list_display = ('user', 'created_at', 'used', 'is_expired')
+    list_filter = ('used', 'created_at')
+    search_fields = ('user__email', 'user__username')
+    readonly_fields = ('created_at',)
+    
+    def is_expired(self, obj):
+        return obj.is_expired()
+    is_expired.boolean = True
+    is_expired.short_description = 'Expired'
+
+@admin.register(PasswordHistory)
+class PasswordHistoryAdmin(admin.ModelAdmin):
+    list_display = ('user', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('user__email', 'user__username')
+    readonly_fields = ('created_at', 'password_hash')
+    
+    def has_add_permission(self, request):
+        # Prevent manual addition of password history records
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        # Prevent editing of password history records
+        return False
+
+@admin.register(PaymentBreakdown)
+class PaymentBreakdownAdmin(admin.ModelAdmin):
+    list_display = ('student', 'description', 'amount', 'due_date', 'is_paid', 'show_in_payment_history', 'created_at')
+    list_filter = ('is_paid', 'show_in_payment_history', 'due_date', 'created_at')
+    search_fields = ('student__first_name', 'student__last_name', 'description')
+    list_editable = ('is_paid', 'show_in_payment_history')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-due_date', '-created_at')
+    
+    fieldsets = (
+        ('Bill Information', {
+            'fields': ('student', 'description', 'amount', 'due_date')
+        }),
+        ('Status', {
+            'fields': ('is_paid', 'show_in_payment_history')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

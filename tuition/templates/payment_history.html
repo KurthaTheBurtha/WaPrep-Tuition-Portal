@@ -8,7 +8,7 @@
             <h2 class="mb-4">Payment History</h2>
             <div class="card shadow-sm">
                 <div class="card-header bg-white">
-                    <h3 class="h5 mb-0">Recent Payments</h3>
+                    <h3 class="h5 mb-0">Recent Transactions</h3>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -23,24 +23,31 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for payment in payments %}
-                                <tr class="payment-row" data-payment-id="{{ payment.id }}" style="cursor: pointer;">
-                                    <td>{{ payment.payment_date|date:"M d, Y H:i" }}</td>
-                                    <td>{{ payment.student.first_name }} {{ payment.student.last_name }}</td>
-                                    <td>${{ payment.amount|floatformat:2 }}</td>
+                                {% for transaction in all_transactions %}
+                                <tr class="transaction-row" 
+                                    data-transaction-type="{{ transaction.type }}"
+                                    data-transaction-id="{{ transaction.object.id }}" 
+                                    style="cursor: pointer;">
+                                    <td>{{ transaction.date|date:"M d, Y H:i" }}</td>
+                                    <td>{{ transaction.student.first_name }} {{ transaction.student.last_name }}</td>
+                                    <td>${{ transaction.amount|floatformat:2 }}</td>
                                     <td>
-                                        <span class="badge {% if payment.status|lower == 'completed' or payment.status|lower == 'succeeded' %}bg-success{% elif payment.status|lower == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
-                                            {{ payment.status|capfirst }}
+                                        <span class="badge {% if transaction.status|lower == 'completed' or transaction.status|lower == 'succeeded' %}bg-success{% elif transaction.status|lower == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ transaction.status|capfirst }}
                                         </span>
                                     </td>
                                     <td class="text-end">
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'payment_detail' payment.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">
-                                                <i class="fas fa-eye me-1"></i> View Details
-                                            </a>
-                                            <a href="{% url 'download_receipt' payment.id %}" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">
-                                                <i class="fas fa-download me-1"></i> Receipt
-                                            </a>
+                                            {% if transaction.type == 'payment' %}
+                                                <a href="{% url 'payment_detail' transaction.object.id %}" class="btn btn-sm btn-secondary" onclick="event.stopPropagation();">
+                                                    <i class="fas fa-eye me-1"></i> View Details
+                                                </a>
+                                                <a href="{% url 'download_receipt' transaction.object.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();" style="background-color: #3498db; border-color: #3498db; color: white;">
+                                                    <i class="fas fa-download me-1"></i> Receipt
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted small">No receipt available</span>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -97,7 +104,7 @@
         border-radius: 0.5rem;
     }
     
-    .payment-row:hover {
+    .transaction-row:hover {
         background-color: rgba(0, 123, 255, 0.05);
     }
     
@@ -112,13 +119,16 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Make payment rows clickable
-    const paymentRows = document.querySelectorAll('.payment-row');
-    paymentRows.forEach(row => {
+    // Make transaction rows clickable (only for payments)
+    const transactionRows = document.querySelectorAll('.transaction-row');
+    transactionRows.forEach(row => {
         row.addEventListener('click', function() {
-            const paymentId = this.getAttribute('data-payment-id');
-            if (paymentId) {
-                window.location.href = `/payment/detail/${paymentId}/`;
+            const transactionType = this.getAttribute('data-transaction-type');
+            const transactionId = this.getAttribute('data-transaction-id');
+            
+            // Only navigate to detail page for payments
+            if (transactionType === 'payment' && transactionId) {
+                window.location.href = `/payment/detail/${transactionId}/`;
             }
         });
     });
