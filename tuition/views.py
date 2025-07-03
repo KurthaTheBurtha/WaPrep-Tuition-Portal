@@ -285,25 +285,55 @@ def payment_history(request):
     # Get all students associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
     
-    # Get payments made by this payer (through their bank accounts or direct payment info)
-    # First, get payments made through saved bank accounts
-    bank_account_payments = Payment.objects.filter(
-        bank_account__user=request.user
-    )
+    # Get all payments for students associated with this payer
+    # This will include all payment types: Stripe payments, saved bank account payments, etc.
+    payments = Payment.objects.filter(
+        student__in=my_students
+    ).order_by('-payment_date')
     
-    # Also get payments where the payer might have used direct payment info
-    # This is a fallback for payments that don't have a bank_account reference
-    direct_payments = Payment.objects.filter(
+    # Get bills that are marked as paid and should show in payment history
+    paid_bills = PaymentBreakdown.objects.filter(
         student__in=my_students,
-        bank_account__isnull=True  # Only payments without bank account reference
-    )
+        is_paid=True,
+        show_in_payment_history=True
+    ).order_by('-updated_at')  # Use updated_at as the "payment date" for bills
     
-    # Combine both querysets and order by payment date
-    payments = (bank_account_payments | direct_payments).distinct().order_by('-payment_date')
+    # Create a combined list of payments and bills for display
+    all_transactions = []
+    
+    # Add regular payments
+    for payment in payments:
+        all_transactions.append({
+            'type': 'payment',
+            'object': payment,
+            'date': payment.payment_date,
+            'amount': payment.amount,
+            'student': payment.student,
+            'status': payment.status,
+            'description': f'Payment - {payment.student.first_name} {payment.student.last_name}',
+            'receipt_number': payment.receipt_number,
+        })
+    
+    # Add paid bills that should show in history
+    for bill in paid_bills:
+        all_transactions.append({
+            'type': 'bill',
+            'object': bill,
+            'date': bill.updated_at,  # Use when the bill was marked as paid
+            'amount': bill.amount,
+            'student': bill.student,
+            'status': 'completed',
+            'description': f'Bill - {bill.description}',
+            'receipt_number': f'BILL-{bill.id}',
+        })
+    
+    # Sort all transactions by date (most recent first)
+    all_transactions.sort(key=lambda x: x['date'], reverse=True)
     
     context = {
         'payments': payments,
         'my_students': my_students,
+        'all_transactions': all_transactions,
     }
     return render(request, 'payment_history.html', context)
 
@@ -758,9 +788,9 @@ def update_student(request):
 
 def generate_unique_user_id(first_name, last_name):
     """
-    Generate a unique 8-character user ID with numbers and special characters.
-    Format: 8 characters including letters, numbers, and special characters
-    Example: K8#mN2$p
+    Generate a unique 6-character user ID with numbers and special characters.
+    Format: 6 characters including letters, numbers, and special characters
+    Example: K8#mN2
     """
     # Define character sets
     letters = string.ascii_letters  # a-z, A-Z
@@ -770,13 +800,13 @@ def generate_unique_user_id(first_name, last_name):
     # Combine all character sets
     all_chars = letters + digits + special_chars
     
-    # Generate unique 8-character user ID
+    # Generate unique 6-character user ID
     max_attempts = 1000  # Prevent infinite loop
     attempts = 0
     
     while attempts < max_attempts:
-        # Generate 8-character ID with at least one letter, one number, and one special character
-        user_id = ''.join(random.choices(all_chars, k=8))
+        # Generate 6-character ID with at least one letter, one number, and one special character
+        user_id = ''.join(random.choices(all_chars, k=6))
         
         # Ensure it contains at least one letter, one number, and one special character
         has_letter = any(c in letters for c in user_id)
@@ -792,7 +822,7 @@ def generate_unique_user_id(first_name, last_name):
     
     # Fallback: if we can't generate a unique ID with the pattern, use a simpler approach
     while True:
-        user_id = 'P' + ''.join(random.choices(string.ascii_uppercase + string.digits + "!@#$%^&*", k=7))
+        user_id = 'P' + ''.join(random.choices(string.ascii_uppercase + string.digits + "!@#$%^&*", k=5))
         if not User.objects.filter(user_id=user_id).exists():
             return user_id
 
@@ -968,12 +998,16 @@ def activation_setup(request):
             if new_password != confirm_password:
                 messages.error(request, 'Passwords do not match.')
             else:
-                # Use the new password validation
-                is_valid, message = validate_password(new_password)
+                # Use the new password validation with user parameter
+                is_valid, message = validate_password(new_password, user)
                 if not is_valid:
                     messages.error(request, message)
                 else:
                     try:
+                        # Store password in history before changing it
+                        from .models import PasswordHistory
+                        PasswordHistory.store_password(user, new_password)
+                        
                         # Set new password and activate account
                         user.set_password(new_password)
                         user.is_active = True
@@ -1232,11 +1266,15 @@ def profile_completion(request):
         return redirect('payer_login')
 
     if request.method == 'POST':
-        form = ProfileCompletionForm(request.POST)
+        form = ProfileCompletionForm(request.POST, user=request.user)
         if form.is_valid():
             # Set the new password
             new_password = form.cleaned_data.get('new_password1')
             if new_password:
+                # Store password in history before changing it
+                from .models import PasswordHistory
+                PasswordHistory.store_password(request.user, new_password)
+                
                 request.user.set_password(new_password)
                 # Activate the user when they set their password
                 request.user.is_active = True
@@ -1248,7 +1286,7 @@ def profile_completion(request):
             messages.success(request, 'Profile completed successfully with secure password! You can now access your dashboard.')
             return redirect('payer_dashboard')
     else:
-        form = ProfileCompletionForm()
+        form = ProfileCompletionForm(user=request.user)
 
     return render(request, 'profile_completion.html', {'form': form})
 
@@ -1350,14 +1388,15 @@ def monthly_bills(request, student_id, month_key):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
-            
+            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
                     amount=amount,
                     due_date=due_date,
-                    is_paid=False
+                    is_paid=False,
+                    show_in_payment_history=show_in_payment_history
                 )
                 messages.success(request, 'Bill added successfully.')
             except Exception as e:
@@ -1368,12 +1407,14 @@ def monthly_bills(request, student_id, month_key):
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
             is_paid = request.POST.get('is_paid') == 'on'
+            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
                 bill.is_paid = is_paid
+                bill.show_in_payment_history = show_in_payment_history
                 bill.save()
                 messages.success(request, 'Bill updated successfully.')
             except PaymentBreakdown.DoesNotExist:
@@ -1482,11 +1523,15 @@ def payer_profile_view(request):
             # If password is being changed, validate and clear the force flag
             new_password = request.POST.get('new_password')
             if new_password:
-                # Use the new password validation
-                is_valid, message = validate_password(new_password)
+                # Use the new password validation with user parameter
+                is_valid, message = validate_password(new_password, user)
                 if not is_valid:
                     messages.error(request, message)
                     return render(request, 'payer_profile.html', {'form': form, 'force_change': force_change})
+                
+                # Store password in history before changing it
+                from .models import PasswordHistory
+                PasswordHistory.store_password(user, new_password)
                 
                 user.set_password(new_password)
                 user.save()
@@ -1769,13 +1814,15 @@ def student_bills(request, student_id):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
                     amount=amount,
                     due_date=due_date,
-                    is_paid=False
+                    is_paid=False,
+                    show_in_payment_history=show_in_payment_history
                 )
                 messages.success(request, 'Bill added successfully.')
             except Exception as e:
@@ -1786,12 +1833,14 @@ def student_bills(request, student_id):
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
             is_paid = request.POST.get('is_paid') == 'on'
+            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
                 bill.is_paid = is_paid
+                bill.show_in_payment_history = show_in_payment_history
                 bill.save()
                 messages.success(request, 'Bill updated successfully.')
             except PaymentBreakdown.DoesNotExist:
@@ -1830,13 +1879,17 @@ def reset_password(request, token):
             if new_password != confirm_password:
                 messages.error(request, 'Passwords do not match.')
             else:
-                # Use the new password validation
-                is_valid, message = validate_password(new_password)
+                # Use the new password validation with user parameter
+                user = password_reset.user
+                is_valid, message = validate_password(new_password, user)
                 if not is_valid:
                     messages.error(request, message)
                 else:
+                    # Store password in history before changing it
+                    from .models import PasswordHistory
+                    PasswordHistory.store_password(user, new_password)
+                    
                     # Set new password
-                    user = password_reset.user
                     user.set_password(new_password)
                     user.save()
                     
@@ -1855,4 +1908,180 @@ def reset_password(request, token):
     except Exception as e:
         messages.error(request, f'Error resetting password: {str(e)}')
         return redirect('forgot_password')
+
+def create_superuser_view(request):
+    """Web view to create a superuser for staging server"""
+    # Only allow in staging/production environments
+    if not settings.DEBUG:
+        # Check for a secret token in the URL or environment
+        token = request.GET.get('token') or request.POST.get('token')
+        expected_token = config('SUPERUSER_TOKEN', default='WAPrep2024!')
+        
+        if token != expected_token:
+            return HttpResponse('Unauthorized', status=403)
+    
+    if request.method == 'POST':
+        email = request.POST.get('email', 'admin@waprep.org')
+        password = request.POST.get('password', 'WAPrep2024!')
+        first_name = request.POST.get('first_name', 'Admin')
+        last_name = request.POST.get('last_name', 'User')
+        
+        try:
+            # Check if superuser already exists
+            if User.objects.filter(email=email).exists():
+                user = User.objects.get(email=email)
+                if user.is_superuser:
+                    messages.warning(request, f'Superuser with email {email} already exists.')
+                else:
+                    # Make existing user a superuser
+                    user.is_superuser = True
+                    user.is_staff = True
+                    user.user_type = 'admin'
+                    user.set_password(password)
+                    user.save()
+                    messages.success(request, f'Existing user {email} has been promoted to superuser.')
+            else:
+                # Create new superuser
+                user = User.objects.create_superuser(
+                    username=email,
+                    email=email,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    user_type='admin',
+                    user_id='ADMIN01'
+                )
+                messages.success(request, f'Superuser created successfully! Email: {email}, Password: {password}')
+            
+            return redirect('admin_login')
+            
+        except Exception as e:
+            messages.error(request, f'Error creating superuser: {str(e)}')
+    
+    return render(request, 'create_superuser.html')
+
+@login_required
+def manage_payment_methods(request):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    # Get or create Stripe customer
+    customer_id = get_or_create_stripe_customer(request.user)
+    
+    # Get saved payment methods from Stripe
+    try:
+        payment_methods = stripe.PaymentMethod.list(
+            customer=customer_id,
+            type='card'
+        )
+        
+        bank_accounts = stripe.PaymentMethod.list(
+            customer=customer_id,
+            type='us_bank_account'
+        )
+        
+        # Combine and sort by creation date
+        all_payment_methods = []
+        
+        for pm in payment_methods.data:
+            all_payment_methods.append({
+                'id': pm.id,
+                'type': 'card',
+                'brand': pm.card.brand.title(),
+                'last4': pm.card.last4,
+                'exp_month': pm.card.exp_month,
+                'exp_year': pm.card.exp_year,
+                'created': pm.created,
+                'status': 'active'
+            })
+        
+        for pm in bank_accounts.data:
+            all_payment_methods.append({
+                'id': pm.id,
+                'type': 'bank_account',
+                'bank_name': pm.us_bank_account.bank_name,
+                'last4': pm.us_bank_account.last4,
+                'account_type': pm.us_bank_account.account_type,
+                'created': pm.created,
+                'status': pm.us_bank_account.status
+            })
+        
+        # Sort by creation date (newest first)
+        all_payment_methods.sort(key=lambda x: x['created'], reverse=True)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading payment methods: {str(e)}')
+        all_payment_methods = []
+    
+    # Get local database records for comparison
+    local_cards = Card.objects.filter(user=request.user)
+    local_bank_accounts = BankAccount.objects.filter(user=request.user)
+    
+    context = {
+        'payment_methods': all_payment_methods,
+        'local_cards': local_cards,
+        'local_bank_accounts': local_bank_accounts,
+        'STRIPE_PUBLISHABLE_KEY': settings.STRIPE_PUBLISHABLE_KEY,
+    }
+    return render(request, 'manage_payment_methods.html', context)
+
+@login_required
+def complete_bank_verification(request, payment_method_id):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    try:
+        # Retrieve the payment method
+        payment_method = stripe.PaymentMethod.retrieve(payment_method_id)
+        
+        # Check if it's a bank account that needs verification
+        if payment_method.type == 'us_bank_account' and payment_method.us_bank_account.status == 'new':
+            # Create a SetupIntent to complete verification
+            customer_id = get_or_create_stripe_customer(request.user)
+            setup_intent = stripe.SetupIntent.create(
+                customer=customer_id,
+                payment_method=payment_method_id,
+                usage='off_session'
+            )
+            
+            context = {
+                'payment_method': payment_method,
+                'setup_intent': setup_intent,
+                'STRIPE_PUBLISHABLE_KEY': settings.STRIPE_PUBLISHABLE_KEY,
+                'STRIPE_CLIENT_SECRET': setup_intent.client_secret,
+            }
+            return render(request, 'complete_bank_verification.html', context)
+        else:
+            messages.error(request, 'This payment method does not require verification or is not a bank account.')
+            return redirect('manage_payment_methods')
+            
+    except Exception as e:
+        messages.error(request, f'Error completing verification: {str(e)}')
+        return redirect('manage_payment_methods')
+
+@login_required
+def remove_payment_method(request, payment_method_id):
+    # Only allow payer users
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('payer_login')
+    
+    if request.method == 'POST':
+        try:
+            # Detach from Stripe customer
+            stripe.PaymentMethod.detach(payment_method_id)
+            
+            # Remove from local database
+            Card.objects.filter(stripe_payment_method_id=payment_method_id).delete()
+            BankAccount.objects.filter(stripe_payment_method_id=payment_method_id).delete()
+            
+            messages.success(request, 'Payment method removed successfully.')
+        except Exception as e:
+            messages.error(request, f'Error removing payment method: {str(e)}')
+    
+    return redirect('manage_payment_methods')
 

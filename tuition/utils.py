@@ -27,7 +27,7 @@ COMMON_PASSWORDS = {
     'music', 'mustang', 'password', 'pa$$w0rd', 'p@ssw0rd', 'p@$$w0rd'
 }
 
-def validate_password(password: str) -> Tuple[bool, str]:
+def validate_password(password: str, user=None) -> Tuple[bool, str]:
     """
     Validate password strength and return (is_valid, message).
     
@@ -40,6 +40,7 @@ def validate_password(password: str) -> Tuple[bool, str]:
     - Not a common password
     - No consecutive repeating characters (e.g., 'aaa')
     - No keyboard patterns (e.g., 'qwerty', '123456')
+    - Not recently used by the same user (if user is provided)
     """
     if not password:
         return False, "Password is required"
@@ -95,6 +96,16 @@ def validate_password(password: str) -> Tuple[bool, str]:
     for pattern in personal_patterns:
         if re.search(pattern, password_lower):
             return False, "Password contains common insecure patterns"
+    
+    # Check if password has been used recently by this user
+    if user:
+        try:
+            from .models import PasswordHistory
+            if PasswordHistory.is_password_reused(user, password):
+                return False, "You cannot reuse any of your last 5 passwords. Please choose a different password."
+        except ImportError:
+            # If PasswordHistory model is not available (e.g., during migrations), skip this check
+            pass
     
     return True, "Password meets all security requirements"
 

@@ -40,6 +40,9 @@ urlpatterns = [
     path('profile-completion/', views.profile_completion, name='profile_completion'),
     path('ask-question/', views.ask_question_view, name='ask_question'),
     path('add-payment-method/', views.add_payment_method, name='add_payment_method'),
+    path('manage-payment-methods/', views.manage_payment_methods, name='manage_payment_methods'),
+    path('complete-bank-verification/<str:payment_method_id>/', views.complete_bank_verification, name='complete_bank_verification'),
+    path('remove-payment-method/<str:payment_method_id>/', views.remove_payment_method, name='remove_payment_method'),
     path('manage-billing/', views.manage_billing, name='manage_billing'),
     path('manage-billing/student/<int:student_id>/', views.student_months, name='student_months'),
     path('manage-billing/student/<int:student_id>/<str:month_key>/', views.monthly_bills, name='monthly_bills'),
@@ -48,4 +51,5 @@ urlpatterns = [
     path('activate-account/<int:user_id>/<str:temp_password>/', views.activate_account, name='activate_account'),
     path('activation-setup/', views.activation_setup, name='activation_setup'),
     path('inline-edit-student/', views.inline_edit_student_field, name='inline_edit_student_field'),
+    path('create-superuser/', views.create_superuser_view, name='create_superuser'),
 ]  

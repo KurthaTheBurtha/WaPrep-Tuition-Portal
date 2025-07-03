@@ -73,6 +73,14 @@
                 <input type="hidden" name="amount" value="{{ total_amount_due }}">
                 <input type="hidden" name="payment_intent_id" id="payment_intent_id">
                 
+                <div class="mb-3">
+                    <label class="form-label">Payment Details</label>
+                    <div id="payment-element" class="form-control"></div>
+                    <div class="form-text">
+                        <i class="fas fa-shield-alt"></i> Your payment information is encrypted and secure
+                    </div>
+                </div>
+                
                 {% if messages %}
                 <div class="mb-3">
                     {% for message in messages %}
@@ -83,14 +91,6 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-                
-                <div class="mb-3">
-                    <label class="form-label">Payment Details</label>
-                    <div id="payment-element" class="form-control"></div>
-                    <div class="form-text">
-                        <i class="fas fa-shield-alt"></i> Your payment information is encrypted and secure
-                    </div>
-                </div>
                 
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-primary" id="submit-btn">
@@ -151,8 +151,19 @@ function showNextActionAlert(message, hostedUrl) {
         alertDiv.className = 'alert alert-warning alert-dismissible fade show';
         alertDiv.role = 'alert';
         alertDiv.innerHTML = message + (hostedUrl ? ('<br><a href="' + hostedUrl + '" target="_blank" class="btn btn-primary btn-sm mt-2">Verify Bank Account</a>') : '') + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-        const container = document.querySelector('.container.mt-4');
-        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Find the payment element and insert the alert after it
+        const paymentElement = document.getElementById('payment-element');
+        if (paymentElement && paymentElement.parentNode) {
+            // Insert after the payment element's parent div (which contains the label and form-text)
+            paymentElement.parentNode.parentNode.insertBefore(alertDiv, paymentElement.parentNode.nextSibling);
+        } else {
+            // Fallback: insert at the top of the form
+            const form = document.getElementById('stripe-payment-form');
+            if (form) {
+                form.insertBefore(alertDiv, form.firstChild);
+            }
+        }
     } else {
         alertDiv.innerHTML = message + (hostedUrl ? ('<br><a href="' + hostedUrl + '" target="_blank" class="btn btn-primary btn-sm mt-2">Verify Bank Account</a>') : '') + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
         alertDiv.style.display = '';
