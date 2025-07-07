@@ -1233,7 +1233,7 @@ Please review and follow up accordingly.
                 subject,
                 message,  
                 config('DEFAULT_FROM_EMAIL'),  # Uses DEFAULT_FROM_EMAIL
-                ['kschimmel@waprep.org'],
+                ['info@waprep.org'],
                 fail_silently=False,
             )
 
@@ -1574,7 +1574,7 @@ Please review and apply changes manually if appropriate.
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
-                ['kschimmel@waprep.org'],  # change to actual recipient
+                ['info@waprep.org'],  # change to actual recipient
                 fail_silently=False
             )
             messages.success(request, "Your profile update request has been sent successfully.")
@@ -1627,7 +1627,7 @@ Message:
                 email_subject,
                 email_body,
                 settings.DEFAULT_FROM_EMAIL,
-                ['kschimmel@waprep.org'],
+                ['info@waprep.org'],
                 fail_silently=False,
             )
 
