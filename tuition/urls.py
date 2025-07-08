@@ -52,4 +52,5 @@ urlpatterns = [
     path('activation-setup/', views.activation_setup, name='activation_setup'),
     path('inline-edit-student/', views.inline_edit_student_field, name='inline_edit_student_field'),
     path('create-superuser/', views.create_superuser_view, name='create_superuser'),
+    path('webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
 ]  

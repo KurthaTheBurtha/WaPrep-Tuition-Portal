@@ -29,6 +29,7 @@ from django.views.decorators.http import require_POST
 from .forms import PayerProfileForm, EditPayerProfileForm, QuestionForm
 from .utils import validate_password, generate_strong_password
 from decimal import Decimal
+from django.views.decorators.csrf import csrf_exempt
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -250,6 +251,15 @@ def process_payment(request):
                 
             elif payment_intent.status == 'processing':
                 # Payment is being processed (common for bank transfers)
+                # Create a pending payment record so it shows up in payment history
+                payment = Payment.objects.create(
+                    student=student,
+                    amount=amount,
+                    status='pending',
+                    bank_account=None,  # No bank account reference stored
+                    receipt_number=payment_intent.id
+                )
+                
                 messages.info(request, f"Payment of ${amount} is being processed. You'll receive a confirmation once it's completed.")
                 return redirect('payment_history')
                 
@@ -284,6 +294,65 @@ def payment_history(request):
     
     # Get all students associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
+    
+    # Check and update pending payment statuses
+    pending_payments = Payment.objects.filter(
+        student__in=my_students,
+        status='pending'
+    )
+    
+    for payment in pending_payments:
+        try:
+            payment_intent = stripe.PaymentIntent.retrieve(payment.receipt_number)
+            if payment_intent.status == 'succeeded':
+                payment.status = 'completed'
+                payment.save()
+                
+                # If this payment doesn't have PaymentItem records yet, create them
+                if not PaymentItem.objects.filter(payment=payment).exists():
+                    # Get current month's payment items
+                    now = timezone.now()
+                    current_month = now.month
+                    current_year = now.year
+                    payment_items = PaymentBreakdown.objects.filter(
+                        student=payment.student,
+                        is_paid=False,
+                        due_date__year=current_year,
+                        due_date__month=current_month
+                    )
+                    
+                    # Create PaymentItem records to link payment to breakdown items
+                    total_payment_amount = payment.amount
+                    payment_items_list = list(payment_items)
+                    
+                    if payment_items_list:
+                        # Calculate how much each item should be paid
+                        total_items_amount = sum(item.amount for item in payment_items_list)
+                        
+                        for item in payment_items_list:
+                            if total_items_amount > 0:
+                                # Calculate proportional amount for this item
+                                item_amount = (item.amount / total_items_amount) * total_payment_amount
+                                # Round to 2 decimal places
+                                item_amount = round(item_amount, 2)
+                            else:
+                                item_amount = Decimal('0.00')
+                            
+                            # Create PaymentItem record
+                            PaymentItem.objects.create(
+                                payment=payment,
+                                breakdown_item=item,
+                                amount_paid=item_amount
+                            )
+                        
+                        # Mark payment items as paid
+                        payment_items.update(is_paid=True)
+                
+            elif payment_intent.status == 'failed':
+                payment.status = 'failed'
+                payment.save()
+        except:
+            pass  # Ignore errors, continue with the view
     
     # Get all payments for students associated with this payer
     # This will include all payment types: Stripe payments, saved bank account payments, etc.
@@ -2084,4 +2153,151 @@ def remove_payment_method(request, payment_method_id):
             messages.error(request, f'Error removing payment method: {str(e)}')
     
     return redirect('manage_payment_methods')
+
+@csrf_exempt
+def stripe_webhook(request):
+    """Handle Stripe webhooks to update payment statuses"""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+    
+    # Get the webhook secret from settings
+    webhook_secret = getattr(settings, 'STRIPE_WEBHOOK_SECRET', None)
+    if not webhook_secret:
+        # For development, allow webhook without secret
+        if settings.DEBUG:
+            webhook_secret = 'whsec_test'  # Dummy secret for development
+        else:
+            return HttpResponse(status=500)
+    
+    # Get the webhook payload
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return HttpResponse(status=400)
+    
+    # Handle the event
+    print(f"Webhook received: {event['type']}")  # Debug logging
+    
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        print(f"Payment succeeded: {payment_intent['id']}")  # Debug logging
+        
+        # Update payment status to completed
+        try:
+            payment = Payment.objects.get(receipt_number=payment_intent['id'])
+            payment.status = 'completed'
+            payment.save()
+            print(f"Payment {payment.id} updated to completed")  # Debug logging
+            
+            # If this payment doesn't have PaymentItem records yet, create them
+            if not PaymentItem.objects.filter(payment=payment).exists():
+                # Get current month's payment items
+                now = timezone.now()
+                current_month = now.month
+                current_year = now.year
+                payment_items = PaymentBreakdown.objects.filter(
+                    student=payment.student,
+                    is_paid=False,
+                    due_date__year=current_year,
+                    due_date__month=current_month
+                )
+                
+                # Create PaymentItem records to link payment to breakdown items
+                total_payment_amount = payment.amount
+                payment_items_list = list(payment_items)
+                
+                if payment_items_list:
+                    # Calculate how much each item should be paid
+                    total_items_amount = sum(item.amount for item in payment_items_list)
+                    
+                    for item in payment_items_list:
+                        if total_items_amount > 0:
+                            # Calculate proportional amount for this item
+                            item_amount = (item.amount / total_items_amount) * total_payment_amount
+                            # Round to 2 decimal places
+                            item_amount = round(item_amount, 2)
+                        else:
+                            item_amount = Decimal('0.00')
+                        
+                        # Create PaymentItem record
+                        PaymentItem.objects.create(
+                            payment=payment,
+                            breakdown_item=item,
+                            amount_paid=item_amount
+                        )
+                    
+                    # Mark payment items as paid
+                    payment_items.update(is_paid=True)
+                    print(f"Payment {payment.id} bills marked as paid")  # Debug logging
+            else:
+                # Mark existing payment breakdown items as paid
+                payment_items = PaymentItem.objects.filter(payment=payment)
+                for payment_item in payment_items:
+                    payment_item.breakdown_item.is_paid = True
+                    payment_item.breakdown_item.save()
+                
+        except Payment.DoesNotExist:
+            # Payment record doesn't exist, create it
+            student_id = payment_intent['metadata'].get('student_id')
+            if student_id:
+                student = Student.objects.get(id=student_id)
+                payment = Payment.objects.create(
+                    student=student,
+                    amount=Decimal(payment_intent['amount']) / 100,
+                    status='completed',
+                    receipt_number=payment_intent['id']
+                )
+                
+                # Create payment items for current month's bills
+                now = timezone.now()
+                current_month = now.month
+                current_year = now.year
+                payment_items = PaymentBreakdown.objects.filter(
+                    student=student,
+                    is_paid=False,
+                    due_date__year=current_year,
+                    due_date__month=current_month
+                )
+                
+                total_payment_amount = Decimal(payment_intent['amount']) / 100
+                payment_items_list = list(payment_items)
+                
+                if payment_items_list:
+                    total_items_amount = sum(item.amount for item in payment_items_list)
+                    
+                    for item in payment_items_list:
+                        if total_items_amount > 0:
+                            item_amount = (item.amount / total_items_amount) * total_payment_amount
+                            item_amount = round(item_amount, 2)
+                        else:
+                            item_amount = Decimal('0.00')
+                        
+                        PaymentItem.objects.create(
+                            payment=payment,
+                            breakdown_item=item,
+                            amount_paid=item_amount
+                        )
+                    
+                    payment_items.update(is_paid=True)
+    
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        # Update payment status to failed
+        try:
+            payment = Payment.objects.get(receipt_number=payment_intent['id'])
+            payment.status = 'failed'
+            payment.save()
+        except Payment.DoesNotExist:
+            pass  # Payment record doesn't exist, nothing to update
+    
+    return HttpResponse(status=200)
 
