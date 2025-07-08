@@ -100,7 +100,8 @@
                                     <th class="border-0 ps-4">Month</th>
                                     <th class="border-0">Total Bills</th>
                                     <th class="border-0">Total Amount</th>
-                                    <th class="border-0">Paid/Unpaid</th>
+                                    <th class="border-0 text-center">Paid Amount</th>
+                                    <th class="border-0 text-center">Unpaid Amount</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
@@ -120,12 +121,11 @@
                                     <td>
                                         <strong>${{ month_data.total_amount|floatformat:2 }}</strong>
                                     </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge bg-success me-1">${{ month_data.paid_amount|floatformat:0 }}</span>
-                                            <span class="text-muted">/</span>
-                                            <span class="badge bg-danger ms-1">${{ month_data.unpaid_amount|floatformat:0 }}</span>
-                                        </div>
+                                    <td class="text-center">
+                                        <span class="text-success fw-bold">${{ month_data.paid_amount|floatformat:0 }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="text-danger fw-bold">${{ month_data.unpaid_amount|floatformat:0 }}</span>
                                     </td>
                                     <td class="text-end pe-4">
                                         <a href="{% url 'monthly_bills' student_id=student.id month_key=month_data.month_key %}" 

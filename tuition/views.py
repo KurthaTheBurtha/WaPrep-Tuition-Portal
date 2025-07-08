@@ -205,6 +205,7 @@ def process_payment(request):
                 # Create payment record only after confirming success
                 payment = Payment.objects.create(
                     student=student,
+                    payer=request.user,  # Set the payer who made the payment
                     amount=amount,
                     status='completed',
                     bank_account=None,  # No bank account reference stored
@@ -254,6 +255,7 @@ def process_payment(request):
                 # Create a pending payment record so it shows up in payment history
                 payment = Payment.objects.create(
                     student=student,
+                    payer=request.user,  # Set the payer who made the payment
                     amount=amount,
                     status='pending',
                     bank_account=None,  # No bank account reference stored
@@ -307,6 +309,7 @@ def payment_history(request):
             if payment_intent.status == 'succeeded':
                 payment.status = 'completed'
                 payment.save()
+                messages.success(request, f"Payment of ${payment.amount} for {payment.student.first_name} {payment.student.last_name} has been completed successfully.")
                 
                 # If this payment doesn't have PaymentItem records yet, create them
                 if not PaymentItem.objects.filter(payment=payment).exists():
@@ -347,16 +350,20 @@ def payment_history(request):
                         
                         # Mark payment items as paid
                         payment_items.update(is_paid=True)
+                        messages.info(request, f"Bills have been marked as paid for {payment.student.first_name} {payment.student.last_name}.")
                 
             elif payment_intent.status == 'failed':
                 payment.status = 'failed'
                 payment.save()
+                messages.error(request, f"Payment of ${payment.amount} for {payment.student.first_name} {payment.student.last_name} has failed.")
         except:
             pass  # Ignore errors, continue with the view
     
-    # Get all payments for students associated with this payer
+    # Get all payments made by this specific payer for their students
     # This will include all payment types: Stripe payments, saved bank account payments, etc.
+    # Including failed payments as requested
     payments = Payment.objects.filter(
+        payer=request.user,
         student__in=my_students
     ).order_by('-payment_date')
     
@@ -399,6 +406,10 @@ def payment_history(request):
     # Sort all transactions by date (most recent first)
     all_transactions.sort(key=lambda x: x['date'], reverse=True)
     
+    # Add a message if no transactions are found
+    if not all_transactions:
+        messages.info(request, "No payment history found. Payments will appear here once you make transactions.")
+    
     context = {
         'payments': payments,
         'my_students': my_students,
@@ -408,15 +419,15 @@ def payment_history(request):
 
 @login_required
 def download_receipt(request, payment_id):
-    # Only allow payer users
-    if request.user.user_type != 'payer':
+    payment = get_object_or_404(Payment, id=payment_id)
+    # Only allow payers to access their own payments, but allow admins to access any
+    if request.user.user_type == 'payer':
+        if not Student.objects.filter(id=payment.student.id, studentpayer__payer=request.user).exists():
+            messages.error(request, 'You do not have permission to access this receipt.')
+            return redirect('payment_history')
+    elif request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('admin_login')
-    payment = get_object_or_404(Payment, id=payment_id)
-    # Check that the user is allowed to access this payment
-    if not Student.objects.filter(id=payment.student.id, studentpayer__payer=request.user).exists():
-        messages.error(request, 'You do not have permission to access this receipt.')
-        return redirect('payment_history')
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
@@ -430,7 +441,9 @@ def download_receipt(request, payment_id):
     y -= 20
     p.drawString(50, y, f'Date: {payment.payment_date.strftime("%B %d, %Y %I:%M %p")}')
     y -= 20
-    p.drawString(50, y, f'Payer: {request.user.get_full_name()} ({request.user.email})')
+    payer_name = payment.payer.get_full_name() if payment.payer else 'N/A'
+    payer_email = payment.payer.email if payment.payer else 'N/A'
+    p.drawString(50, y, f'Payer: {payer_name} ({payer_email})')
     y -= 20
     p.drawString(50, y, f'Student: {payment.student.first_name} {payment.student.last_name}')
     y -= 20
@@ -1498,14 +1511,76 @@ def monthly_bills(request, student_id, month_key):
                 messages.success(request, 'Bill removed successfully.')
             except Exception as e:
                 messages.error(request, f'Error removing bill: {str(e)}')
+        elif action == 'add_payment':
+            payer_id = request.POST.get('payer_id')
+            amount = request.POST.get('amount')
+            payment_date = request.POST.get('payment_date')
+            status = request.POST.get('status')
+            payment_method = request.POST.get('payment_method', 'manual')
+            notes = request.POST.get('notes', '')
+            bill_ids = request.POST.getlist('bill_ids')
+            
+            try:
+                payer = User.objects.get(id=payer_id, user_type='payer')
+                
+                # Create the payment
+                payment = Payment.objects.create(
+                    student=student,
+                    payer=payer,
+                    amount=amount,
+                    payment_date=payment_date,
+                    status=status,
+                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+                )
+                
+                # Create payment items for each selected bill
+                total_paid = 0
+                for bill_id in bill_ids:
+                    bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                    bill_amount = request.POST.get(f'bill_amount_{bill_id}', bill.amount)
+                    
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount
+                    )
+                    
+                    total_paid += float(bill_amount)
+                    
+                    # Mark bill as paid if payment status is completed
+                    if status == 'completed':
+                        bill.is_paid = True
+                        bill.save()
+                
+                # Update student's current balance
+                if status == 'completed':
+                    student.current_balance = student.current_balance - total_paid
+                    student.save()
+                
+                messages.success(request, f'Payment of ${amount} added successfully for {payer.first_name} {payer.last_name}.')
+                
+            except User.DoesNotExist:
+                messages.error(request, 'Selected payer not found.')
+            except PaymentBreakdown.DoesNotExist:
+                messages.error(request, 'One or more selected bills not found.')
+            except Exception as e:
+                messages.error(request, f'Error adding payment: {str(e)}')
         
         return redirect('monthly_bills', student_id=student_id, month_key=month_key)
+    
+    # Get payments for this student in this month
+    payments = Payment.objects.filter(
+        student=student,
+        payment_date__gte=first_day,
+        payment_date__lte=last_day
+    ).order_by('-payment_date')
     
     context = {
         'student': student,
         'month_key': month_key,
         'month_display': month_display,
         'bills': bills,
+        'payments': payments,
         'total_amount': total_amount,
         'paid_amount': paid_amount,
         'unpaid_amount': unpaid_amount,
@@ -1924,10 +1999,77 @@ def student_bills(request, student_id):
                 messages.success(request, 'Bill removed successfully.')
             except Exception as e:
                 messages.error(request, f'Error removing bill: {str(e)}')
+        elif action == 'add_payment':
+            payer_id = request.POST.get('payer_id')
+            amount = request.POST.get('amount')
+            payment_date = request.POST.get('payment_date')
+            status = request.POST.get('status')
+            payment_method = request.POST.get('payment_method', 'manual')
+            notes = request.POST.get('notes', '')
+            bill_ids = request.POST.getlist('bill_ids')
+            
+            try:
+                payer = User.objects.get(id=payer_id, user_type='payer')
+                
+                # Create the payment
+                payment = Payment.objects.create(
+                    student=student,
+                    payer=payer,
+                    amount=amount,
+                    payment_date=payment_date,
+                    status=status,
+                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+                )
+                
+                # Create payment items for each selected bill
+                total_paid = 0
+                for bill_id in bill_ids:
+                    bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                    bill_amount = request.POST.get(f'bill_amount_{bill_id}', bill.amount)
+                    
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount
+                    )
+                    
+                    total_paid += float(bill_amount)
+                    
+                    # Mark bill as paid if payment status is completed
+                    if status == 'completed':
+                        bill.is_paid = True
+                        bill.save()
+                
+                # Update student's current balance
+                if status == 'completed':
+                    student.current_balance = student.current_balance - total_paid
+                    student.save()
+                
+                messages.success(request, f'Payment of ${amount} added successfully for {payer.first_name} {payer.last_name}.')
+                
+            except User.DoesNotExist:
+                messages.error(request, 'Selected payer not found.')
+            except PaymentBreakdown.DoesNotExist:
+                messages.error(request, 'One or more selected bills not found.')
+            except Exception as e:
+                messages.error(request, f'Error adding payment: {str(e)}')
+        
         return redirect('student_bills', student_id=student.id)
+    
+    # Get payments for this student, grouped by month
+    payments_by_month = {}
+    payments = Payment.objects.filter(student=student).order_by('-payment_date')
+    
+    for payment in payments:
+        month_key = payment.payment_date.strftime('%Y-%m')
+        if month_key not in payments_by_month:
+            payments_by_month[month_key] = []
+        payments_by_month[month_key].append(payment)
+    
     context = {
         'student': student,
         'bills': bills,
+        'payments_by_month': payments_by_month,
     }
     return render(request, 'student_bills.html', context)
 
@@ -2250,8 +2392,18 @@ def stripe_webhook(request):
             student_id = payment_intent['metadata'].get('student_id')
             if student_id:
                 student = Student.objects.get(id=student_id)
+                # Get the user from metadata
+                user_id = payment_intent['metadata'].get('user_id')
+                payer = None
+                if user_id:
+                    try:
+                        payer = User.objects.get(id=user_id)
+                    except User.DoesNotExist:
+                        pass
+                
                 payment = Payment.objects.create(
                     student=student,
+                    payer=payer,  # Set the payer from metadata
                     amount=Decimal(payment_intent['amount']) / 100,
                     status='completed',
                     receipt_number=payment_intent['id']

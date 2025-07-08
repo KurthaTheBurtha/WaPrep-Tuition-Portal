@@ -239,6 +239,130 @@
             </div>
         </div>
     </div>
+
+    <!-- Payments Section -->
+    <!-- DEBUG: payments_by_month = {{ payments_by_month }} -->
+    {% if payments_by_month %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-credit-card me-2"></i>Payment History
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="accordion" id="paymentsAccordion">
+                        {% for month_key, payments in payments_by_month.items %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ month_key }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ month_key }}" aria-expanded="false" aria-controls="collapse{{ month_key }}">
+                                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                        <span>
+                                            <i class="fas fa-calendar me-2"></i>
+                                            {{ payments.0.payment_date|date:"F Y" }}
+                                        </span>
+                                        <span class="badge bg-primary">{{ payments|length }} payment{{ payments|length|pluralize }}</span>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ month_key }}" class="accordion-collapse collapse" aria-labelledby="heading{{ month_key }}" data-bs-parent="#paymentsAccordion">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th class="border-0 ps-4">Date</th>
+                                                    <th class="border-0">Amount</th>
+                                                    <th class="border-0">Status</th>
+                                                    <th class="border-0">Payer</th>
+                                                    <th class="border-0">Payment Method</th>
+                                                    <th class="border-0">Receipt</th>
+                                                    <th class="border-0 text-end pe-4">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for payment in payments %}
+                                                <tr>
+                                                    <td class="ps-4">{{ payment.payment_date|date:"M d, Y g:i A" }}</td>
+                                                    <td>${{ payment.amount|floatformat:2 }}</td>
+                                                    <td>
+                                                        {% if payment.status == 'completed' %}
+                                                            <span class="badge bg-success">Completed</span>
+                                                        {% elif payment.status == 'pending' %}
+                                                            <span class="badge bg-warning">Pending</span>
+                                                        {% elif payment.status == 'failed' %}
+                                                            <span class="badge bg-danger">Failed</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if payment.payer %}
+                                                            {{ payment.payer.first_name }} {{ payment.payer.last_name }}
+                                                        {% else %}
+                                                            <span class="text-muted">Unknown</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if payment.bank_account %}
+                                                            <i class="fas fa-university me-1"></i>
+                                                            {{ payment.bank_account.nickname }} (...{{ payment.bank_account.last4 }})
+                                                        {% elif payment.routing_number %}
+                                                            <i class="fas fa-university me-1"></i>
+                                                            Bank Account (...{{ payment.account_number|slice:"-4:" }})
+                                                        {% else %}
+                                                            <i class="fas fa-credit-card me-1"></i>
+                                                            Card Payment
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if payment.receipt_number %}
+                                                            <span class="text-muted small">{{ payment.receipt_number }}</span>
+                                                        {% else %}
+                                                            <span class="text-muted small">No receipt</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td class="text-end pe-4">
+                                                        {% if payment.status == 'completed' %}
+                                                            <a href="{% url 'download_receipt' payment.id %}" class="btn btn-sm btn-outline-primary" title="Download Receipt">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        {% endif %}
+                                                        <button class="btn btn-sm btn-outline-info" title="View Details" onclick="viewPaymentDetails({{ payment.id }})">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="text-muted">
+                        <div class="mb-3">
+                            <i class="fas fa-credit-card fa-3x"></i>
+                        </div>
+                        <h5>No Payment History</h5>
+                        <p class="mb-0">No payments have been made for this student yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="mt-3">
         <a href="{% url 'manage_billing' %}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i> Back to Billing Management
@@ -371,5 +495,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function viewPaymentDetails(paymentId) {
+    // For now, just show an alert. In the future, this could open a modal with detailed payment information
+    alert('Payment details for payment ID: ' + paymentId + '\n\nThis feature will show detailed payment information including:\n- Payment items breakdown\n- Stripe transaction details\n- Payment method information\n- Timestamps and status history');
+}
 </script>
 {% endblock %} 

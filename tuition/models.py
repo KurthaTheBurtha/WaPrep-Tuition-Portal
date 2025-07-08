@@ -70,6 +70,7 @@ class Payment(models.Model):
     )
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payments')
+    payer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_made', null=True, blank=True, help_text='The payer who made this payment')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
