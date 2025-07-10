@@ -7,7 +7,7 @@ app_name = 'tuition'
 urlpatterns = [
     path('', views.home, name='home'),
     path('admin/', admin.site.urls),
-    path('login/', views.payer_login, name='login'),
+
     path('login/payer/', views.payer_login, name='payer_login'),
     path('login/admin/', views.admin_login, name='admin_login'),
     path('logout/', views.logout_view, name='logout'),
@@ -37,7 +37,7 @@ urlpatterns = [
     path('request-account/', views.request_account_view, name='request_account'),
     path('payer/profile/', views.payer_profile_view, name='payer_profile'),
     path('payer/edit-profile/', views.edit_payer_profile, name='edit_payer_profile'),
-    path('profile-completion/', views.profile_completion, name='profile_completion'),
+
     path('ask-question/', views.ask_question_view, name='ask_question'),
     path('add-payment-method/', views.add_payment_method, name='add_payment_method'),
     path('manage-payment-methods/', views.manage_payment_methods, name='manage_payment_methods'),
@@ -51,6 +51,7 @@ urlpatterns = [
     path('activate-account/<int:user_id>/<str:temp_password>/', views.activate_account, name='activate_account'),
     path('activation-setup/', views.activation_setup, name='activation_setup'),
     path('inline-edit-student/', views.inline_edit_student_field, name='inline_edit_student_field'),
+    path('inline-edit-payment-notes/', views.inline_edit_payment_notes, name='inline_edit_payment_notes'),
     path('create-superuser/', views.create_superuser_view, name='create_superuser'),
     path('webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
 ]  

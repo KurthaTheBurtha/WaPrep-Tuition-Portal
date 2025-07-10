@@ -2,6 +2,39 @@
 {% load static %}
 
 {% block content %}
+<!-- Hidden CSRF token for AJAX requests -->
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<style>
+.payment-notes-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.payment-notes-text {
+    flex: 1;
+}
+
+.payment-notes-input {
+    flex: 1;
+    margin-right: 5px;
+}
+
+.edit-notes-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.edit-notes-btn:hover {
+    opacity: 1;
+}
+
+.payment-notes-cell:hover .edit-notes-btn {
+    opacity: 1;
+}
+</style>
+
 <div class="container-fluid py-4">
     <div class="row mb-4 g-3">
         <div class="col-12 col-md-6">
@@ -277,6 +310,7 @@
                                                     <th class="border-0">Status</th>
                                                     <th class="border-0">Payer</th>
                                                     <th class="border-0">Payment Method</th>
+                                                    <th class="border-0">Notes</th>
                                                     <th class="border-0">Receipt</th>
                                                     <th class="border-0 text-end pe-4">Actions</th>
                                                 </tr>
@@ -303,7 +337,30 @@
                                                         {% endif %}
                                                     </td>
                                                     <td>
-                                                        {% if payment.bank_account %}
+                                                        {% if payment.payment_method %}
+                                                            {% if payment.payment_method == 'cash' %}
+                                                                <i class="fas fa-money-bill-wave me-1"></i>
+                                                                Cash
+                                                            {% elif payment.payment_method == 'check' %}
+                                                                <i class="fas fa-university me-1"></i>
+                                                                Check
+                                                            {% elif payment.payment_method == 'credit card machine' %}
+                                                                <i class="fas fa-credit-card me-1"></i>
+                                                                Credit Card Machine
+                                                            {% elif payment.payment_method == 'other' %}
+                                                                <i class="fas fa-ellipsis-h me-1"></i>
+                                                                Other
+                                                            {% elif payment.payment_method == 'card' %}
+                                                                <i class="fas fa-credit-card me-1"></i>
+                                                                Credit/Debit Card
+                                                            {% elif payment.payment_method == 'us_bank_account' %}
+                                                                <i class="fas fa-university me-1"></i>
+                                                                Bank Account
+                                                            {% else %}
+                                                                <i class="fas fa-credit-card me-1"></i>
+                                                                {{ payment.payment_method|title }}
+                                                            {% endif %}
+                                                        {% elif payment.bank_account %}
                                                             <i class="fas fa-university me-1"></i>
                                                             {{ payment.bank_account.nickname }} (...{{ payment.bank_account.last4 }})
                                                         {% elif payment.routing_number %}
@@ -313,6 +370,19 @@
                                                             <i class="fas fa-credit-card me-1"></i>
                                                             Card Payment
                                                         {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <div class="payment-notes-cell" data-payment-id="{{ payment.id }}">
+                                                            {% if payment.notes %}
+                                                                <span class="payment-notes-text text-muted small" title="{{ payment.notes }}">{{ payment.notes|truncatechars:30 }}</span>
+                                                            {% else %}
+                                                                <span class="payment-notes-text text-muted small">-</span>
+                                                            {% endif %}
+                                                            <input type="text" class="payment-notes-input form-control form-control-sm d-none" value="{{ payment.notes|default:'' }}" placeholder="Add notes...">
+                                                            <button class="btn btn-sm btn-link p-0 ms-1 edit-notes-btn" title="Edit notes">
+                                                                <i class="fas fa-edit text-muted"></i>
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         {% if payment.receipt_number %}
@@ -500,5 +570,108 @@ function viewPaymentDetails(paymentId) {
     // For now, just show an alert. In the future, this could open a modal with detailed payment information
     alert('Payment details for payment ID: ' + paymentId + '\n\nThis feature will show detailed payment information including:\n- Payment items breakdown\n- Stripe transaction details\n- Payment method information\n- Timestamps and status history');
 }
+
+// Inline payment notes editing
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle edit notes button clicks
+    document.querySelectorAll('.edit-notes-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const cell = this.closest('.payment-notes-cell');
+            const textSpan = cell.querySelector('.payment-notes-text');
+            const input = cell.querySelector('.payment-notes-input');
+            const paymentId = cell.getAttribute('data-payment-id');
+            
+            // Show input, hide text
+            textSpan.classList.add('d-none');
+            input.classList.remove('d-none');
+            this.classList.add('d-none');
+            
+            // Focus input and select all text
+            input.focus();
+            input.select();
+            
+            // Add save/cancel buttons
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn btn-sm btn-success ms-1';
+            saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+            saveBtn.title = 'Save';
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+            cancelBtn.title = 'Cancel';
+            
+            cell.appendChild(saveBtn);
+            cell.appendChild(cancelBtn);
+            
+            // Handle save
+            saveBtn.addEventListener('click', function() {
+                const newNotes = input.value.trim();
+                
+                // Send AJAX request to update notes
+                fetch('/inline-edit-payment-notes/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({
+                        payment_id: paymentId,
+                        notes: newNotes
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update display
+                        if (newNotes) {
+                            textSpan.textContent = newNotes.length > 30 ? newNotes.substring(0, 30) + '...' : newNotes;
+                            textSpan.title = newNotes;
+                        } else {
+                            textSpan.textContent = '-';
+                            textSpan.title = '';
+                        }
+                        
+                        // Hide input, show text
+                        textSpan.classList.remove('d-none');
+                        input.classList.add('d-none');
+                        this.classList.add('d-none');
+                        cancelBtn.remove();
+                        btn.classList.remove('d-none');
+                    } else {
+                        alert('Error saving notes: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving notes. Please try again.');
+                });
+            });
+            
+            // Handle cancel
+            cancelBtn.addEventListener('click', function() {
+                // Restore original value
+                input.value = textSpan.title || '';
+                
+                // Hide input, show text
+                textSpan.classList.remove('d-none');
+                input.classList.add('d-none');
+                this.classList.add('d-none');
+                saveBtn.remove();
+                btn.classList.remove('d-none');
+            });
+            
+            // Handle Enter key
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    saveBtn.click();
+                } else if (e.key === 'Escape') {
+                    cancelBtn.click();
+                }
+            });
+        });
+    });
+});
 </script>
 {% endblock %} 

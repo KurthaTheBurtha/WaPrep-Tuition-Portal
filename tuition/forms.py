@@ -59,45 +59,7 @@ class BankAccountPaymentForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['bank_account'].queryset = BankAccount.objects.filter(user=user)
 
-class ProfileCompletionForm(forms.Form):
-    new_password1 = forms.CharField(
-        label='New Password',
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'id': 'new_password1',
-            'placeholder': 'Enter your new password'
-        }),
-        help_text='Password must be at least 8 characters with uppercase, lowercase, number, and special character (!@#$%^&*). You cannot reuse any of your last 5 passwords.'
-    )
-    new_password2 = forms.CharField(
-        label='Confirm New Password',
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'id': 'new_password2',
-            'placeholder': 'Confirm your new password'
-        }),
-        help_text='Enter the same password as above, for verification'
-    )
 
-    def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-
-    def clean(self):
-        cleaned_data = super().clean()
-        new_password1 = cleaned_data.get('new_password1')
-        new_password2 = cleaned_data.get('new_password2')
-        
-        if new_password1 and new_password2:
-            if new_password1 != new_password2:
-                raise forms.ValidationError("The two password fields didn't match.")
-            
-            # Use the new password validation with user parameter
-            is_valid, message = validate_password(new_password1, self.user)
-            if not is_valid:
-                raise forms.ValidationError(message)
-        
-        return cleaned_data
 
 class PayerProfileForm(forms.ModelForm):
     class Meta:

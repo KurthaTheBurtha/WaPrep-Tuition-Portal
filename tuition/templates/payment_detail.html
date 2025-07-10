@@ -47,13 +47,41 @@
                             <div class="mb-3">
                                 <strong>Payment Method:</strong>
                                 <span class="ms-2">
-                                    {% if payment.bank_account %}
+                                    {% if payment.payment_method %}
+                                        {% if payment.payment_method == 'cash' %}
+                                            <i class="fas fa-money-bill-wave me-1"></i>
+                                            Cash
+                                        {% elif payment.payment_method == 'check' %}
+                                            <i class="fas fa-university me-1"></i>
+                                            Check
+                                        {% elif payment.payment_method == 'credit card machine' %}
+                                            <i class="fas fa-credit-card me-1"></i>
+                                            Credit Card Machine
+                                        {% elif payment.payment_method == 'other' %}
+                                            <i class="fas fa-ellipsis-h me-1"></i>
+                                            Other
+                                        {% elif payment.payment_method == 'card' %}
+                                            <i class="fas fa-credit-card me-1"></i>
+                                            Credit/Debit Card
+                                        {% elif payment.payment_method == 'us_bank_account' %}
+                                            <i class="fas fa-university me-1"></i>
+                                            Bank Account
+                                        {% else %}
+                                            {{ payment.payment_method|title }}
+                                        {% endif %}
+                                    {% elif payment.bank_account %}
                                         {{ payment.bank_account.nickname }} (...{{ payment.bank_account.last4 }})
                                     {% else %}
                                         Bank Account
                                     {% endif %}
                                 </span>
                             </div>
+                            {% if payment.notes %}
+                            <div class="mb-3">
+                                <strong>Notes:</strong>
+                                <span class="ms-2">{{ payment.notes }}</span>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

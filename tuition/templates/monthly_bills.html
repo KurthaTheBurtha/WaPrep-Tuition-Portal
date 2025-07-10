@@ -2,6 +2,39 @@
 {% load static %}
 
 {% block content %}
+<!-- Hidden CSRF token for AJAX requests -->
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<style>
+.payment-notes-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.payment-notes-text {
+    flex: 1;
+}
+
+.payment-notes-input {
+    flex: 1;
+    margin-right: 5px;
+}
+
+.edit-notes-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.edit-notes-btn:hover {
+    opacity: 1;
+}
+
+.payment-notes-cell:hover .edit-notes-btn {
+    opacity: 1;
+}
+</style>
+
 <div class="container-fluid py-4">
     <!-- Header -->
     <div class="row mb-4">
@@ -46,7 +79,7 @@
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Paid Amount</h6>
-                            <h2 class="card-title mb-0">${{ paid_amount|floatformat:0 }}</h2>
+                            <h2 class="card-title mb-0">${{ paid_amount|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -61,7 +94,7 @@
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Unpaid Amount</h6>
-                            <h2 class="card-title mb-0">${{ unpaid_amount|floatformat:0 }}</h2>
+                            <h2 class="card-title mb-0">${{ unpaid_amount|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -76,7 +109,7 @@
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Total Amount</h6>
-                            <h2 class="card-title mb-0">${{ total_amount|floatformat:0 }}</h2>
+                            <h2 class="card-title mb-0">${{ total_amount|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -88,7 +121,7 @@
     <div class="row mb-4">
         <div class="col-12">
             <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal" id="addBillBtn">
-                <i class="fas fa-plus me-1"></i> Add Bill for {{ month_display }}
+                <i class="fas fa-plus me-1"></i> Add Bill
             </button>
             <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" id="addPaymentBtn">
                 <i class="fas fa-credit-card me-1"></i> Add Payment for {{ month_display }}
@@ -207,6 +240,7 @@
                                     <th class="border-0">Status</th>
                                     <th class="border-0">Payer</th>
                                     <th class="border-0">Payment Method</th>
+                                    <th class="border-0">Notes</th>
                                     <th class="border-0">Receipt</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
                                 </tr>
@@ -233,7 +267,30 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if payment.bank_account %}
+                                        {% if payment.payment_method %}
+                                            {% if payment.payment_method == 'cash' %}
+                                                <i class="fas fa-money-bill-wave me-1"></i>
+                                                Cash
+                                            {% elif payment.payment_method == 'check' %}
+                                                <i class="fas fa-university me-1"></i>
+                                                Check
+                                            {% elif payment.payment_method == 'credit card machine' %}
+                                                <i class="fas fa-credit-card me-1"></i>
+                                                Credit Card Machine
+                                            {% elif payment.payment_method == 'other' %}
+                                                <i class="fas fa-ellipsis-h me-1"></i>
+                                                Other
+                                            {% elif payment.payment_method == 'card' %}
+                                                <i class="fas fa-credit-card me-1"></i>
+                                                Credit/Debit Card
+                                            {% elif payment.payment_method == 'us_bank_account' %}
+                                                <i class="fas fa-university me-1"></i>
+                                                Bank Account
+                                            {% else %}
+                                                <i class="fas fa-credit-card me-1"></i>
+                                                {{ payment.payment_method|title }}
+                                            {% endif %}
+                                        {% elif payment.bank_account %}
                                             <i class="fas fa-university me-1"></i>
                                             {{ payment.bank_account.nickname }} (...{{ payment.bank_account.last4 }})
                                         {% elif payment.routing_number %}
@@ -243,6 +300,19 @@
                                             <i class="fas fa-credit-card me-1"></i>
                                             Card Payment
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="payment-notes-cell" data-payment-id="{{ payment.id }}">
+                                            {% if payment.notes %}
+                                                <span class="payment-notes-text text-muted small" title="{{ payment.notes }}">{{ payment.notes|truncatechars:30 }}</span>
+                                            {% else %}
+                                                <span class="payment-notes-text text-muted small">-</span>
+                                            {% endif %}
+                                            <input type="text" class="payment-notes-input form-control form-control-sm d-none" value="{{ payment.notes|default:'' }}" placeholder="Add notes...">
+                                            <button class="btn btn-sm btn-link p-0 ms-1 edit-notes-btn" title="Edit notes">
+                                                <i class="fas fa-edit text-muted"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                     <td>
                                         {% if payment.receipt_number %}
@@ -305,7 +375,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addBillModalLabel">Add Bill for {{ student.first_name }} {{ student.last_name }} - {{ month_display }}</h5>
+                <h5 class="modal-title" id="addBillModalLabel">Add Bill</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" id="addBillForm">
@@ -313,23 +383,29 @@
                 <input type="hidden" name="action" value="add">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
+                        <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
                         <input type="text" name="description" id="description" class="form-control" required 
                                placeholder="e.g., Tuition Payment, Activity Fee">
                     </div>
                     <div class="mb-3">
-                        <label for="amount" class="form-label">Amount</label>
+                        <label for="amount" class="form-label">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0" required 
+                            <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01" required 
                                    placeholder="0.00">
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="due_date" class="form-label">Due Date</label>
-                        <input type="date" name="due_date" id="due_date" class="form-control" 
-                               min="{{ first_day|date:'Y-m-d' }}" max="{{ last_day|date:'Y-m-d' }}" required>
-                        <div class="form-text">Must be within {{ month_display }}</div>
+                        <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
+                        <input type="date" name="due_date" id="due_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid">
+                            <label class="form-check-label" for="is_paid">
+                                Mark as paid
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -432,23 +508,15 @@
                                 <label for="payment_date" class="form-label">Payment Date *</label>
                                 <input type="datetime-local" class="form-control" name="payment_date" id="payment_date" required>
                             </div>
-                            <div class="mb-3">
-                                <label for="payment_status" class="form-label">Payment Status *</label>
-                                <select class="form-select" name="status" id="payment_status" required>
-                                    <option value="completed">Completed</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="failed">Failed</option>
-                                </select>
-                            </div>
+
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="payment_method" class="form-label">Payment Method</label>
                                 <select class="form-select" name="payment_method" id="payment_method">
-                                    <option value="manual">Manual Entry</option>
                                     <option value="cash">Cash</option>
                                     <option value="check">Check</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="credit_card_machine">Credit Card Machine</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -839,9 +907,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const payerId = document.getElementById('payment_payer').value;
             const amount = document.getElementById('payment_amount').value;
             const paymentDate = document.getElementById('payment_date').value;
-            const status = document.getElementById('payment_status').value;
             
-            if (!payerId || !amount || !paymentDate || !status) {
+            if (!payerId || !amount || !paymentDate) {
                 e.preventDefault();
                 alert('Please fill in all required fields.');
                 return false;
@@ -897,6 +964,113 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('total_selected').textContent = '0.00';
         });
     }
+
+    // Inline payment notes editing
+    console.log('Setting up inline editing...');
+    const editButtons = document.querySelectorAll('.edit-notes-btn');
+    console.log('Found', editButtons.length, 'edit buttons');
+    
+    editButtons.forEach(function(btn) {
+        console.log('Setting up button:', btn);
+        btn.addEventListener('click', function(e) {
+            console.log('Edit button clicked');
+            e.stopPropagation();
+            const cell = this.closest('.payment-notes-cell');
+            const textSpan = cell.querySelector('.payment-notes-text');
+            const input = cell.querySelector('.payment-notes-input');
+            const paymentId = cell.getAttribute('data-payment-id');
+            
+            // Show input, hide text
+            textSpan.classList.add('d-none');
+            input.classList.remove('d-none');
+            this.classList.add('d-none');
+            
+            // Focus input and select all text
+            input.focus();
+            input.select();
+            
+            // Add save/cancel buttons
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn btn-sm btn-success ms-1';
+            saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+            saveBtn.title = 'Save';
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+            cancelBtn.title = 'Cancel';
+            
+            cell.appendChild(saveBtn);
+            cell.appendChild(cancelBtn);
+            
+            // Handle save
+            saveBtn.addEventListener('click', function() {
+                const newNotes = input.value.trim();
+                console.log('Saving notes:', newNotes, 'for payment:', paymentId);
+                
+                // Send AJAX request to update notes
+                fetch('/inline-edit-payment-notes/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({
+                        payment_id: paymentId,
+                        notes: newNotes
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update display
+                        if (newNotes) {
+                            textSpan.textContent = newNotes.length > 30 ? newNotes.substring(0, 30) + '...' : newNotes;
+                            textSpan.title = newNotes;
+                        } else {
+                            textSpan.textContent = '-';
+                            textSpan.title = '';
+                        }
+                        
+                        // Hide input, show text
+                        textSpan.classList.remove('d-none');
+                        input.classList.add('d-none');
+                        this.classList.add('d-none');
+                        cancelBtn.remove();
+                        btn.classList.remove('d-none');
+                    } else {
+                        alert('Error saving notes: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving notes. Please try again.');
+                });
+            });
+            
+            // Handle cancel
+            cancelBtn.addEventListener('click', function() {
+                // Restore original value
+                input.value = textSpan.title || '';
+                
+                // Hide input, show text
+                textSpan.classList.remove('d-none');
+                input.classList.add('d-none');
+                this.classList.add('d-none');
+                saveBtn.remove();
+                btn.classList.remove('d-none');
+            });
+            
+            // Handle Enter key
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    saveBtn.click();
+                } else if (e.key === 'Escape') {
+                    cancelBtn.click();
+                }
+            });
+        });
+    });
 });
 </script>
 {% endblock %} 

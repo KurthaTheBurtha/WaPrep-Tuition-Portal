@@ -264,7 +264,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'manage_billing' %}active{% endif %}" href="{% url 'manage_billing' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'manage_billing' or request.resolver_match.url_name == 'student_months' or request.resolver_match.url_name == 'monthly_bills' or request.resolver_match.url_name == 'student_bills' %}active{% endif %}" href="{% url 'manage_billing' %}">
                             <i class="fas fa-file-invoice-dollar me-1"></i> Manage Billing
                         </a>
                     </li>
@@ -306,6 +306,16 @@
             backdrops.forEach(b => b.remove());
             document.body.classList.remove('modal-open');
             document.body.style = ''; // Clear overflow and other inline styles
+            
+            // Auto-dismiss messages after 5 seconds
+            const messages = document.querySelectorAll('.alert');
+            messages.forEach(function(message) {
+                setTimeout(function() {
+                    if (message && message.parentNode) {
+                        message.remove();
+                    }
+                }, 5000);
+            });
         });
     </script>
 </body>
