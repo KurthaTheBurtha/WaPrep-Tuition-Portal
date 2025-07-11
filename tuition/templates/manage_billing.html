@@ -13,6 +13,23 @@
 .clickable-row {
     transition: all 0.2s ease;
 }
+
+.text-success {
+    color: #198754 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+}
+
+.table td {
+    vertical-align: middle;
+}
 </style>
 
 <div class="container-fluid py-4">
@@ -57,7 +74,7 @@
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Unpaid Amount</h6>
-                            <h2 class="card-title mb-0">${{ total_all_unpaid|floatformat:0 }}</h2>
+                            <h2 class="card-title mb-0">${{ total_all_unpaid|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -72,7 +89,7 @@
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Total Amount</h6>
-                            <h2 class="card-title mb-0">${{ total_all_amount|floatformat:0 }}</h2>
+                            <h2 class="card-title mb-0">${{ total_all_amount|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -95,7 +112,8 @@
                                 <tr>
                                     <th class="border-0 ps-4">Student</th>
                                     <th class="border-0">Total Amount</th>
-                                    <th class="border-0">Paid/Unpaid</th>
+                                    <th class="border-0 text-center">Paid Amount</th>
+                                    <th class="border-0 text-center">Unpaid Amount</th>
                                     <th class="border-0 text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
@@ -111,12 +129,11 @@
                                     <td>
                                         <strong>${{ entry.total_amount|floatformat:2 }}</strong>
                                     </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge bg-success me-1">${{ entry.paid_amount|floatformat:0 }}</span>
-                                            <span class="text-muted">/</span>
-                                            <span class="badge bg-danger ms-1">${{ entry.unpaid_amount|floatformat:0 }}</span>
-                                        </div>
+                                    <td class="text-center">
+                                        <span class="text-success fw-bold">${{ entry.paid_amount|floatformat:2 }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="text-danger fw-bold">${{ entry.unpaid_amount|floatformat:2 }}</span>
                                     </td>
                                     <td class="text-end pe-4">
                                         <a href="{% url 'student_months' student_id=entry.student.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">

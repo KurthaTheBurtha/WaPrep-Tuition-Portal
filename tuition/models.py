@@ -70,9 +70,12 @@ class Payment(models.Model):
     )
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payments')
+    payer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_made', null=True, blank=True, help_text='The payer who made this payment')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_method = models.CharField(max_length=50, null=True, blank=True, help_text='Method used for payment (e.g., cash, check, credit card machine, other)')
+    notes = models.TextField(blank=True, null=True, help_text='Admin notes about this payment')
     bank_account = models.ForeignKey('BankAccount', on_delete=models.PROTECT, related_name='payments', null=True, blank=True)
     # Keep these fields for backward compatibility and for payments made without a saved bank account
     routing_number = models.CharField(max_length=9, null=True, blank=True)

@@ -61,10 +61,88 @@
 
             {% if breakdown_items and STRIPE_CLIENT_SECRET %}
             
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i>
-                <strong>Secure Payment:</strong> You can pay with credit/debit cards or US bank accounts. 
-                All payment information is securely handled by Stripe.
+            <!-- No Fees Information Box -->
+            <div class="no-fees-info mb-3">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-check-circle me-2"></i>Payment Processing Information
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="fee-info mb-2">
+                                    <h6 class="text-success mb-2">
+                                        <i class="fas fa-check-circle me-1"></i>We Cover All Processing Fees
+                                    </h6>
+                                    <p class="mb-2">
+                                        Washington Preparatory School covers all payment processing fees, ensuring you pay exactly the amount due with no additional charges. We believe in transparent, straightforward billing for our families.
+                                    </p>
+                                    <div class="fee-benefits">
+                                        <div class="benefit-item d-flex align-items-center mb-1">
+                                            <i class="fas fa-check text-success me-2"></i>
+                                            <span class="small">No processing fees added to your payment</span>
+                                        </div>
+                                        <div class="benefit-item d-flex align-items-center mb-1">
+                                            <i class="fas fa-university text-success me-2"></i>
+                                            <span class="small">Bank account payments preferred (reduces our costs)</span>
+                                        </div>
+                                        <div class="benefit-item d-flex align-items-center">
+                                            <i class="fas fa-handshake text-success me-2"></i>
+                                            <span class="small">Helps us maintain affordable tuition rates</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="savings-section text-center">
+                                    <div class="savings-icon mb-2">
+                                        <i class="fas fa-chart-line fa-lg text-success"></i>
+                                    </div>
+                                    <h6 class="text-success mb-1">Cost Efficiency</h6>
+                                    <p class="small text-muted mb-0">
+                                        Bank account payments reduce our processing costs by approximately 70%, allowing us to invest more in your child's education.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Secure Payment Information -->
+            <div class="payment-info mb-4">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>Secure Payment Processing
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="security-info">
+                            <h6 class="text-primary mb-2">
+                                <i class="fas fa-lock me-1"></i>Secure Payment Processing
+                            </h6>
+                            <p class="mb-2 small">
+                                You can pay with credit/debit cards or US bank accounts. 
+                                All payment information is securely handled by Stripe, 
+                                a PCI Service Provider Level 1 certified payment processor.
+                            </p>
+                            <div class="security-features">
+                                <span class="badge bg-success me-1 mb-1">
+                                    <i class="fas fa-check me-1"></i>Encrypted
+                                </span>
+                                <span class="badge bg-success me-1 mb-1">
+                                    <i class="fas fa-check me-1"></i>PCI Compliant
+                                </span>
+                                <span class="badge bg-success me-1 mb-1">
+                                    <i class="fas fa-check me-1"></i>Secure
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <form id="stripe-payment-form" method="post" action="{% url 'process_payment' %}">
@@ -74,7 +152,6 @@
                 <input type="hidden" name="payment_intent_id" id="payment_intent_id">
                 
                 <div class="mb-3">
-                    <label class="form-label">Payment Details</label>
                     <div id="payment-element" class="form-control"></div>
                     <div class="form-text">
                         <i class="fas fa-shield-alt"></i> Your payment information is encrypted and secure
@@ -105,6 +182,172 @@
         </div>
     </div>
 </div>
+
+<style>
+/* No fees information box styling */
+.no-fees-info .card {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.2s ease-in-out;
+    border: 2px solid #198754;
+}
+
+.no-fees-info .card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.no-fees-info .card-header {
+    border-radius: 0.5rem 0.5rem 0 0 !important;
+    border-bottom: none;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%) !important;
+}
+
+.no-fees-info .card-body {
+    padding: 1rem;
+}
+
+.fee-info p {
+    font-size: 0.9rem;
+    color: #495057;
+    line-height: 1.5;
+}
+
+.fee-benefits .benefit-item {
+    padding: 0.25rem 0;
+}
+
+.fee-benefits .benefit-item i {
+    width: 18px;
+    text-align: center;
+}
+
+.fee-benefits .small {
+    font-size: 0.85rem;
+    color: #495057;
+    line-height: 1.3;
+}
+
+.savings-section .savings-icon {
+    color: #198754;
+}
+
+.savings-section .small {
+    font-size: 0.8rem;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+/* Combined payment information styling */
+.payment-info .card {
+    border-radius: 0.75rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.2s ease-in-out;
+    border: 2px solid #007bff;
+}
+
+.payment-info .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.payment-info .card-header {
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+    border-bottom: none;
+    padding: 1rem;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+}
+
+.payment-info .card-body {
+    padding: 1rem;
+}
+
+.security-info .small {
+    font-size: 0.875rem;
+    color: #495057;
+}
+
+.security-features .badge {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.4rem;
+}
+
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .no-fees-info .col-md-4 {
+        margin-top: 1rem;
+    }
+    
+    .no-fees-info .card {
+        margin-bottom: 1rem;
+    }
+    
+    .payment-info .col-md-4 {
+        margin-top: 1rem;
+    }
+    
+    .payment-info .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Payment summary enhancements */
+.payment-summary {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border-left: 4px solid #007bff;
+}
+
+.payment-breakdown .table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.payment-breakdown .table thead th {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+.payment-breakdown .table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Form enhancements */
+.form-control {
+    border-radius: 0.5rem;
+    border: 2px solid #e9ecef;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.btn {
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.3);
+}
+</style>
 
 <script>
 const stripe = Stripe("{{ STRIPE_PUBLISHABLE_KEY|default:'' }}");

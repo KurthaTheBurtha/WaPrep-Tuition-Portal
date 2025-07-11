@@ -201,4 +201,13 @@ def generate_strong_password() -> str:
     # Shuffle the password
     random.shuffle(password)
     
-    return ''.join(password) 
+    return ''.join(password)
+
+def clear_messages(request):
+    """
+    Clear all Django messages from the request.
+    Useful for preventing message persistence across redirects.
+    """
+    from django.contrib import messages
+    storage = messages.get_messages(request)
+    storage.used = True 
