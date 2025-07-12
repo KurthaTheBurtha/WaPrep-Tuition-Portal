@@ -1609,9 +1609,20 @@ def student_months(request, student_id):
     # Get all bills for this student with due dates
     all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('-due_date')
     
-    # Determine the year(s) to show. We'll use the current year.
-    current_year = date.today().year
-    # Optionally, you could use the year of the earliest/latest bill, or allow selection.
+    # Define the billing cycle: June 2025 to May 2026
+    billing_cycle_months = []
+    
+    # Add June 2025 to December 2025
+    for month in range(6, 13):  # June (6) to December (12)
+        month_key = f"2025-{month:02d}"
+        month_display = f"{calendar.month_name[month]} 2025"
+        billing_cycle_months.append((month_key, month_display))
+    
+    # Add January 2026 to May 2026
+    for month in range(1, 6):  # January (1) to May (5)
+        month_key = f"2026-{month:02d}"
+        month_display = f"{calendar.month_name[month]} 2026"
+        billing_cycle_months.append((month_key, month_display))
 
     # Group bills by month
     monthly_billing = {}
@@ -1638,12 +1649,15 @@ def student_months(request, student_id):
             monthly_billing[month_key]['unpaid_bills'] += 1
             monthly_billing[month_key]['unpaid_amount'] += bill.amount
 
-    # Add missing months for the current year
-    for m in range(1, 13):
-        month_key = f"{current_year}-{m:02d}"
-        month_display = f"{calendar.month_name[m]} {current_year}"
-        if month_key not in monthly_billing:
-            monthly_billing[month_key] = {
+    # Create the final sorted months list in billing cycle order
+    sorted_months = []
+    for month_key, month_display in billing_cycle_months:
+        if month_key in monthly_billing:
+            # Month has bills, use existing data
+            sorted_months.append((month_key, monthly_billing[month_key]))
+        else:
+            # Month has no bills, create empty entry
+            sorted_months.append((month_key, {
                 'month_display': month_display,
                 'month_key': month_key,
                 'total_bills': 0,
@@ -1652,33 +1666,7 @@ def student_months(request, student_id):
                 'unpaid_bills': 0,
                 'paid_amount': 0,
                 'unpaid_amount': 0
-            }
-
-    # Sort by month key: current month first, then future months chronologically
-    current_month = date.today().month
-    current_year = date.today().year
-    
-    def sort_key(month_item):
-        month_key = month_item[0]
-        year, month = map(int, month_key.split('-'))
-        
-        # Calculate months difference from current month
-        months_diff = (year - current_year) * 12 + (month - current_month)
-        
-        # Priority order:
-        # 1. Current month (months_diff = 0) - highest priority (1000)
-        # 2. Future months (months_diff > 0) - chronological order (999, 998, 997, ...)
-        # 3. Past months (months_diff < 0) - lowest priority (-1000)
-        
-        if months_diff == 0:  # Current month
-            return 1000
-        elif months_diff > 0:  # Future months - chronological order
-            return 999 - months_diff  # 999, 998, 997, ... (newer months first)
-        else:  # Past months
-            return -1000 + months_diff
-    
-    # Sort in descending order to get highest priority first
-    sorted_months = sorted(monthly_billing.items(), key=sort_key, reverse=True)
+            }))
     
     # Calculate student totals
     total_bills = all_bills.count()
