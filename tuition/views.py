@@ -1048,6 +1048,90 @@ WAPrep Administration
     
     return redirect('student_profile', student_id=student_payer.student.id)
 
+@login_required
+def send_activation_reminders(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    if request.method == 'POST':
+        try:
+            # Get all unactivated payers
+            unactivated_payers = User.objects.filter(
+                user_type='payer',
+                is_active=False
+            ).distinct()
+            
+            if not unactivated_payers.exists():
+                messages.info(request, 'No unactivated payers found.')
+                return redirect('students')
+            
+            success_count = 0
+            error_count = 0
+            
+            for payer in unactivated_payers:
+                try:
+                    # Generate new temporary password
+                    import secrets
+                    temp_password = secrets.token_urlsafe(12)
+                    payer.set_password(temp_password)
+                    payer.save()
+                    
+                    # Get associated students for context
+                    student_payers = StudentPayer.objects.filter(payer=payer)
+                    student_names = [f"{sp.student.first_name} {sp.student.last_name}" for sp in student_payers]
+                    students_text = ", ".join(student_names) if student_names else "students"
+                    
+                    # Send activation email
+                    activation_url = request.build_absolute_uri(f'/activate-account/{payer.id}/{temp_password}/')
+                    subject = 'WAPrep Tuition Portal - Account Activation Reminder'
+                    message = f"""
+Hello {payer.first_name},
+
+This is a reminder that you have an account at Washington Preparatory School's Tuition Portal that needs to be activated.
+
+You are listed as a payer for: {students_text}
+
+Your User ID: {payer.user_id}
+Your Temporary Password: {temp_password}
+
+To activate your account, please click the following link:
+{activation_url}
+
+After activation, you will be required to change your password.
+
+If you have any questions, please contact us.
+
+Best regards,
+WAPrep Administration
+                    """.strip()
+                    
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [payer.email],
+                        fail_silently=False,
+                    )
+                    
+                    success_count += 1
+                    
+                except Exception as e:
+                    error_count += 1
+                    # Log the error but continue with other payers
+                    print(f"Error sending activation email to {payer.email}: {str(e)}")
+            
+            if success_count > 0:
+                messages.success(request, f'Activation reminders sent to {success_count} payer(s).')
+            if error_count > 0:
+                messages.warning(request, f'Failed to send {error_count} reminder(s). Check logs for details.')
+                
+        except Exception as e:
+            messages.error(request, f'Error sending activation reminders: {str(e)}')
+    
+    return redirect('students')
+
 def activate_account(request, user_id, temp_password):
     try:
         user = get_object_or_404(User, id=user_id)
@@ -2573,4 +2657,340 @@ def stripe_webhook(request):
             pass  # Payment record doesn't exist, nothing to update
     
     return HttpResponse(status=200)
+
+
+# Monitoring and Health Check Views
+
+def health_check(request):
+    """
+    Health check endpoint for monitoring systems.
+    """
+    from .utils import log_system_health
+    from .models import AuditLog, SecurityEvent, SystemHealth
+    import psutil
+    
+    health_status = {
+        'status': 'healthy',
+        'timestamp': timezone.now().isoformat(),
+        'checks': {}
+    }
+    
+    # Database health check
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        health_status['checks']['database'] = {'status': 'healthy', 'message': 'Database connection OK'}
+    except Exception as e:
+        health_status['checks']['database'] = {'status': 'critical', 'message': f'Database error: {str(e)}'}
+        health_status['status'] = 'critical'
+    
+    # System resource checks
+    try:
+        # Memory usage
+        memory = psutil.virtual_memory()
+        memory_status = 'healthy'
+        if memory.percent > 90:
+            memory_status = 'critical'
+        elif memory.percent > 80:
+            memory_status = 'warning'
+        
+        health_status['checks']['memory'] = {
+            'status': memory_status,
+            'message': f'Memory usage: {memory.percent:.1f}%',
+            'usage_percent': memory.percent
+        }
+        
+        if memory_status != 'healthy':
+            health_status['status'] = 'warning'
+        
+        # Disk usage
+        disk = psutil.disk_usage('.')
+        disk_status = 'healthy'
+        if disk.percent > 90:
+            disk_status = 'critical'
+        elif disk.percent > 80:
+            disk_status = 'warning'
+        
+        health_status['checks']['disk'] = {
+            'status': disk_status,
+            'message': f'Disk usage: {disk.percent:.1f}%',
+            'usage_percent': disk.percent
+        }
+        
+        if disk_status != 'healthy':
+            health_status['status'] = 'warning'
+            
+    except Exception as e:
+        health_status['checks']['system'] = {'status': 'critical', 'message': f'System check error: {str(e)}'}
+        health_status['status'] = 'critical'
+    
+    # Audit system health
+    try:
+        recent_logs = AuditLog.objects.filter(
+            timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
+        ).count()
+        
+        recent_security_events = SecurityEvent.objects.filter(
+            timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
+        ).count()
+        
+        audit_status = 'healthy'
+        if recent_security_events > 10:
+            audit_status = 'warning'
+        
+        health_status['checks']['audit_system'] = {
+            'status': audit_status,
+            'message': f'Audit logs: {recent_logs}, Security events: {recent_security_events}',
+            'recent_logs': recent_logs,
+            'recent_security_events': recent_security_events
+        }
+        
+    except Exception as e:
+        health_status['checks']['audit_system'] = {'status': 'critical', 'message': f'Audit system error: {str(e)}'}
+        health_status['status'] = 'critical'
+    
+    # Log the health check
+    log_system_health(
+        'health_check_endpoint',
+        health_status['status'].upper(),
+        f"Health check completed with status: {health_status['status']}",
+        health_status['checks']
+    )
+    
+    return JsonResponse(health_status)
+
+
+@login_required
+def audit_summary(request):
+    """
+    Audit summary endpoint for monitoring dashboard.
+    """
+    from .utils import get_audit_summary
+    
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    days = int(request.GET.get('days', 30))
+    summary = get_audit_summary(days)
+    
+    return JsonResponse(summary)
+
+
+@login_required
+def security_events(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    # Get recent security events
+    from .models import SecurityEvent
+    events = SecurityEvent.objects.all().order_by('-timestamp')[:50]
+    
+    context = {
+        'events': events,
+    }
+    return render(request, 'security_events.html', context)
+
+@login_required
+def mass_add_bills(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            description = request.POST.get('description', '').strip()
+            amount = request.POST.get('amount')
+            due_date = request.POST.get('due_date')
+            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
+            
+            # Validate required fields
+            if not description:
+                messages.error(request, 'Description is required.')
+                return redirect('manage_billing')
+            
+            if not amount or float(amount) <= 0:
+                messages.error(request, 'Amount must be greater than 0.')
+                return redirect('manage_billing')
+            
+            if not due_date:
+                messages.error(request, 'Due date is required.')
+                return redirect('manage_billing')
+            
+            # Get selected student IDs from the form
+            student_ids = request.POST.get('student_ids', '').split(',')
+            student_ids = [sid.strip() for sid in student_ids if sid.strip()]
+            
+            if not student_ids:
+                messages.error(request, 'No students selected.')
+                return redirect('manage_billing')
+            
+            success_count = 0
+            error_count = 0
+            error_details = []
+            
+            for student_id in student_ids:
+                try:
+                    student = Student.objects.get(id=student_id)
+                    PaymentBreakdown.objects.create(
+                        student=student,
+                        description=description,
+                        amount=amount,
+                        due_date=due_date,
+                        is_paid=False,
+                        show_in_payment_history=show_in_payment_history
+                    )
+                    success_count += 1
+                except Student.DoesNotExist:
+                    error_count += 1
+                    error_details.append(f"Student ID {student_id} not found")
+                except Exception as e:
+                    error_count += 1
+                    error_details.append(f"Student {student_id}: {str(e)}")
+                    print(f"Error adding bill to student {student_id}: {str(e)}")
+            
+            # Show detailed success/error messages
+            if success_count > 0:
+                messages.success(request, f'Successfully added bills to {success_count} student(s).')
+            if error_count > 0:
+                error_msg = f'Failed to add bills to {error_count} student(s).'
+                if len(error_details) <= 3:  # Show details if not too many
+                    error_msg += f' Details: {", ".join(error_details)}'
+                messages.warning(request, error_msg)
+                
+        except Exception as e:
+            messages.error(request, f'Error adding bills: {str(e)}')
+    
+    return redirect('manage_billing')
+
+@login_required
+def mass_billing_actions(request):
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        student_ids = request.POST.get('student_ids', '').split(',')
+        student_ids = [sid.strip() for sid in student_ids if sid.strip()]
+        
+        if not student_ids:
+            messages.error(request, 'No students selected.')
+            return redirect('manage_billing')
+        
+        if action == 'send_reminders':
+            success_count = 0
+            error_count = 0
+            no_bills_count = 0
+            no_payers_count = 0
+            error_details = []
+            
+            for student_id in student_ids:
+                try:
+                    student = Student.objects.get(id=student_id)
+                    
+                    # Get all payers for this student
+                    student_payers = StudentPayer.objects.filter(student=student)
+                    
+                    if not student_payers.exists():
+                        no_payers_count += 1
+                        continue
+                    
+                    # Get unpaid bills for this student
+                    unpaid_bills = PaymentBreakdown.objects.filter(
+                        student=student,
+                        is_paid=False
+                    ).order_by('due_date')
+                    
+                    if not unpaid_bills.exists():
+                        no_bills_count += 1
+                        continue
+                    
+                    # Calculate total unpaid amount
+                    total_unpaid = unpaid_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+                    
+                    # Send reminders to all active payers
+                    payer_emails_sent = 0
+                    for student_payer in student_payers:
+                        payer = student_payer.payer
+                        
+                        # Only send to active payers
+                        if not payer.is_active:
+                            continue
+                        
+                        # Create bill reminder email
+                        subject = 'WAPrep Tuition Portal - Bill Reminder'
+                        message = f"""
+Hello {payer.first_name},
+
+This is a reminder that you have outstanding bills for {student.first_name} {student.last_name} at Washington Preparatory School.
+
+Total Outstanding Amount: ${total_unpaid:.2f}
+
+Outstanding Bills:
+"""
+                        
+                        for bill in unpaid_bills:
+                            message += f"- {bill.description}: ${bill.amount:.2f} (Due: {bill.due_date.strftime('%B %d, %Y')})\n"
+                        
+                        message += f"""
+
+To view and pay these bills, please log in to your account at:
+{request.build_absolute_uri('/')}
+
+If you have any questions, please contact us.
+
+Best regards,
+WAPrep Administration
+                        """.strip()
+                        
+                        try:
+                            send_mail(
+                                subject,
+                                message,
+                                settings.DEFAULT_FROM_EMAIL,
+                                [payer.email],
+                                fail_silently=False,
+                            )
+                            payer_emails_sent += 1
+                        except Exception as e:
+                            error_details.append(f"Failed to send to {payer.email}: {str(e)}")
+                            print(f"Error sending reminder to {payer.email}: {str(e)}")
+                    
+                    if payer_emails_sent > 0:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                            
+                except Student.DoesNotExist:
+                    error_count += 1
+                    error_details.append(f"Student ID {student_id} not found")
+                except Exception as e:
+                    error_count += 1
+                    error_details.append(f"Student {student_id}: {str(e)}")
+                    print(f"Error processing student {student_id}: {str(e)}")
+            
+            # Show detailed success/error messages
+            if success_count > 0:
+                messages.success(request, f'Successfully sent bill reminders for {success_count} student(s).')
+            if no_bills_count > 0:
+                messages.info(request, f'{no_bills_count} student(s) have no unpaid bills.')
+            if no_payers_count > 0:
+                messages.info(request, f'{no_payers_count} student(s) have no associated payers.')
+            if error_count > 0:
+                error_msg = f'Failed to send reminders for {error_count} student(s).'
+                if len(error_details) <= 3:  # Show details if not too many
+                    error_msg += f' Details: {", ".join(error_details)}'
+                messages.warning(request, error_msg)
+        else:
+            messages.error(request, 'Invalid action specified.')
+    
+    return redirect('manage_billing')
 

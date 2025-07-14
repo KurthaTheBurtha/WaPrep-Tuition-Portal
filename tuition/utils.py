@@ -1,5 +1,17 @@
 import re
 from typing import Tuple, List
+import logging
+import hashlib
+import json
+from django.utils import timezone
+from django.conf import settings
+from django.http import HttpRequest
+from .models import AuditLog, DataVersion, SystemHealth, SecurityEvent
+from django.db import models
+
+
+logger = logging.getLogger('tuition.audit')
+
 
 # Common weak passwords to block
 COMMON_PASSWORDS = {
@@ -211,3 +223,264 @@ def clear_messages(request):
     from django.contrib import messages
     storage = messages.get_messages(request)
     storage.used = True 
+
+
+def get_client_ip(request: HttpRequest) -> str:
+    """
+    Get the client's IP address from the request.
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+def log_audit_event(action: str, model_name: str, record_id: int, user=None, 
+                   field_name=None, old_value=None, new_value=None, 
+                   description=None, metadata=None, request=None):
+    """
+    Log an audit event with comprehensive information.
+    """
+    if not getattr(settings, 'AUDIT_LOG_ENABLED', True):
+        return None
+    
+    # Get request information if available
+    user_ip = None
+    user_agent = None
+    session_id = None
+    request_id = None
+    
+    if request:
+        user_ip = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        session_id = request.session.session_key if hasattr(request, 'session') else None
+        request_id = getattr(request, 'request_id', None)
+    
+    # Filter sensitive data
+    if field_name in getattr(settings, 'AUDIT_LOG_SENSITIVE_FIELDS', []):
+        old_value = '[REDACTED]'
+        new_value = '[REDACTED]'
+    
+    # Truncate values if too long
+    max_length = getattr(settings, 'AUDIT_LOG_MAX_VALUE_LENGTH', 1000)
+    if old_value and len(str(old_value)) > max_length:
+        old_value = str(old_value)[:max_length-3] + '...'
+    if new_value and len(str(new_value)) > max_length:
+        new_value = str(new_value)[:max_length-3] + '...'
+    
+    # Create audit log entry
+    audit_log = AuditLog.log_change(
+        action=action,
+        model_name=model_name,
+        record_id=record_id,
+        user=user,
+        field_name=field_name or '',
+        old_value=old_value or '',
+        new_value=new_value or '',
+        description=description or '',
+        metadata=metadata or {},
+        user_ip=user_ip,
+        user_agent=user_agent,
+        session_id=session_id,
+        request_id=request_id,
+    )
+    
+    # Log to file system as well
+    logger.info(
+        f"{action} on {model_name} #{record_id}",
+        extra={
+            'user': user.username if user else 'anonymous',
+            'ip': user_ip or 'unknown',
+            'action': action,
+            'model': model_name,
+            'record_id': record_id,
+        }
+    )
+    
+    return audit_log
+
+
+def create_data_version(model_name: str, record_id: int, data_snapshot: dict, user=None):
+    """
+    Create a version snapshot of a record.
+    """
+    return DataVersion.create_version(
+        model_name=model_name,
+        record_id=record_id,
+        data_snapshot=data_snapshot,
+        user=user
+    )
+
+
+def log_security_event(event_type: str, severity: str, description: str, 
+                      user=None, user_ip=None, metadata=None):
+    """
+    Log a security event.
+    """
+    if not getattr(settings, 'SECURITY_LOG_ENABLED', True):
+        return None
+    
+    security_logger = logging.getLogger('tuition.security')
+    
+    # Create security event
+    security_event = SecurityEvent.objects.create(
+        event_type=event_type,
+        severity=severity,
+        description=description,
+        user=user,
+        user_ip=user_ip,
+        metadata=metadata or {}
+    )
+    
+    # Log to file system
+    security_logger.warning(
+        description,
+        extra={
+            'user': user.username if user else 'anonymous',
+            'ip': user_ip or 'unknown',
+            'event_type': event_type,
+        }
+    )
+    
+    return security_event
+
+
+def log_system_health(component: str, status: str, message: str = '', metrics: dict = None):
+    """
+    Log system health information.
+    """
+    if not getattr(settings, 'MONITORING_ENABLED', True):
+        return None
+    
+    monitoring_logger = logging.getLogger('tuition.monitoring')
+    
+    # Create system health record
+    health_record = SystemHealth.objects.create(
+        component=component,
+        status=status,
+        message=message,
+        metrics=metrics or {}
+    )
+    
+    # Log to file system
+    monitoring_logger.info(
+        f"{component}: {status} - {message}",
+        extra={'metrics': metrics or {}}
+    )
+    
+    return health_record
+
+
+def calculate_data_integrity_hash(data: dict) -> str:
+    """
+    Calculate a hash for data integrity checking.
+    """
+    # Sort the data to ensure consistent hashing
+    sorted_data = json.dumps(data, sort_keys=True, default=str)
+    return hashlib.sha256(sorted_data.encode()).hexdigest()
+
+
+def check_data_integrity(model_instance, fields_to_check=None):
+    """
+    Check data integrity for a model instance.
+    """
+    if fields_to_check is None:
+        fields_to_check = [field.name for field in model_instance._meta.fields 
+                          if not field.name.startswith('_')]
+    
+    data = {}
+    for field_name in fields_to_check:
+        if hasattr(model_instance, field_name):
+            data[field_name] = getattr(model_instance, field_name)
+    
+    return calculate_data_integrity_hash(data)
+
+
+def get_model_changes(old_instance, new_instance, fields_to_track=None):
+    """
+    Get the changes between two model instances.
+    """
+    if fields_to_track is None:
+        fields_to_track = [field.name for field in new_instance._meta.fields 
+                          if not field.name.startswith('_')]
+    
+    changes = {}
+    for field_name in fields_to_track:
+        if hasattr(old_instance, field_name) and hasattr(new_instance, field_name):
+            old_value = getattr(old_instance, field_name)
+            new_value = getattr(new_instance, field_name)
+            
+            if old_value != new_value:
+                changes[field_name] = {
+                    'old': old_value,
+                    'new': new_value
+                }
+    
+    return changes
+
+
+def cleanup_old_audit_logs():
+    """
+    Clean up old audit logs based on retention policy.
+    """
+    retention_days = getattr(settings, 'AUDIT_LOG_RETENTION_DAYS', 365)
+    cutoff_date = timezone.now() - timezone.timedelta(days=retention_days)
+    
+    # Delete old audit logs
+    deleted_count = AuditLog.objects.filter(timestamp__lt=cutoff_date).delete()[0]
+    
+    # Delete old security events (keep for 2 years)
+    security_cutoff = timezone.now() - timezone.timedelta(days=730)
+    security_deleted = SecurityEvent.objects.filter(timestamp__lt=security_cutoff).delete()[0]
+    
+    # Delete old system health records (keep for 30 days)
+    health_cutoff = timezone.now() - timezone.timedelta(days=30)
+    health_deleted = SystemHealth.objects.filter(timestamp__lt=health_cutoff).delete()[0]
+    
+    logger.info(
+        f"Cleaned up old logs: {deleted_count} audit logs, {security_deleted} security events, {health_deleted} health records"
+    )
+    
+    return {
+        'audit_logs_deleted': deleted_count,
+        'security_events_deleted': security_deleted,
+        'health_records_deleted': health_deleted
+    }
+
+
+def get_audit_summary(days=30):
+    """
+    Get a summary of audit activity for the specified number of days.
+    """
+    cutoff_date = timezone.now() - timezone.timedelta(days=days)
+    
+    # Get audit log summary
+    audit_summary = AuditLog.objects.filter(
+        timestamp__gte=cutoff_date
+    ).values('action', 'model_name').annotate(
+        count=models.Count('id')
+    ).order_by('-count')
+    
+    # Get security events summary
+    security_summary = SecurityEvent.objects.filter(
+        timestamp__gte=cutoff_date
+    ).values('event_type', 'severity').annotate(
+        count=models.Count('id')
+    ).order_by('-count')
+    
+    # Get user activity summary
+    user_activity = AuditLog.objects.filter(
+        timestamp__gte=cutoff_date,
+        user__isnull=False
+    ).values('user__username').annotate(
+        action_count=models.Count('id')
+    ).order_by('-action_count')[:10]
+    
+    return {
+        'audit_summary': list(audit_summary),
+        'security_summary': list(security_summary),
+        'user_activity': list(user_activity),
+        'period_days': days
+    } 

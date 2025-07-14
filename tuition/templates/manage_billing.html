@@ -30,6 +30,54 @@
 .table td {
     vertical-align: middle;
 }
+
+.mass-actions {
+    display: none;
+}
+
+.mass-actions.show {
+    display: block;
+}
+
+.checkbox-cell {
+    width: 40px;
+    text-align: center;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.loading-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.btn.loading .loading-spinner {
+    display: inline-block;
+}
+
+.btn.loading .btn-text {
+    display: none;
+}
+
+.tooltip-inner {
+    max-width: 200px;
+    padding: 8px 12px;
+    font-size: 12px;
+}
 </style>
 
 <div class="container-fluid py-4">
@@ -97,54 +145,125 @@
         </div>
     </div>
 
+    <!-- Mass Actions Bar -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm mass-actions" id="massActionsBar">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted">Selected <span id="selectedCount">0</span> student(s)</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="addBillBtn" 
+                                    data-bs-toggle="modal" data-bs-target="#massAddBillsModal"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Add the same bill to all selected students">
+                                <span class="loading-spinner"></span>
+                                <span class="btn-text">
+                                    <i class="fas fa-plus me-1"></i> Add Bill
+                                </span>
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" id="sendReminderBtn"
+                                    onclick="sendMassReminders()"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Send bill reminders to all payers of selected students">
+                                <span class="loading-spinner"></span>
+                                <span class="btn-text">
+                                    <i class="fas fa-envelope me-1"></i> Send Bill Reminder
+                                </span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSelection()"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Clear all selections">
+                                <i class="fas fa-times me-1"></i> Clear Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content -->
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">Student Billing Overview</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Student Billing Overview</h5>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAll()"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Select all students in the list">
+                                <i class="fas fa-check-square me-1"></i> Select All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectNone()"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Deselect all students">
+                                <i class="fas fa-square me-1"></i> Select None
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     {% if student_billing %}
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="border-0 ps-4">Student</th>
-                                    <th class="border-0">Total Amount</th>
-                                    <th class="border-0 text-center">Paid Amount</th>
-                                    <th class="border-0 text-center">Unpaid Amount</th>
-                                    <th class="border-0 text-end pe-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for entry in student_billing %}
-                                <tr class="clickable-row" onclick="window.location.href='{% url 'student_months' student_id=entry.student.id %}'" style="cursor: pointer;">
-                                    <td class="ps-4">
-                                        <div>
-                                            <h6 class="mb-0">{{ entry.student.first_name }} {{ entry.student.last_name }}</h6>
-                                            <small class="text-muted">{{ entry.student.student_id }}</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <strong>${{ entry.total_amount|floatformat:2 }}</strong>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="text-success fw-bold">${{ entry.paid_amount|floatformat:2 }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="text-danger fw-bold">${{ entry.unpaid_amount|floatformat:2 }}</span>
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <a href="{% url 'student_months' student_id=entry.student.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">
-                                            <i class="fas fa-calendar me-1"></i> View Months
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                    <form id="massActionForm" method="post">
+                        {% csrf_token %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="border-0 checkbox-cell">
+                                            <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onchange="toggleSelectAll()"
+                                                   data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                   title="Select/deselect all students">
+                                        </th>
+                                        <th class="border-0 ps-2">Student</th>
+                                        <th class="border-0">Total Amount</th>
+                                        <th class="border-0 text-center">Paid Amount</th>
+                                        <th class="border-0 text-center">Unpaid Amount</th>
+                                        <th class="border-0 text-end pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in student_billing %}
+                                    <tr class="clickable-row" onclick="handleRowClick(event, '{{ entry.student.id }}')" style="cursor: pointer;">
+                                        <td class="checkbox-cell" onclick="event.stopPropagation();">
+                                            <input type="checkbox" class="form-check-input student-checkbox" 
+                                                   value="{{ entry.student.id }}" 
+                                                   onchange="updateSelection()"
+                                                   data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                   title="Select this student">
+                                        </td>
+                                        <td class="ps-2">
+                                            <div>
+                                                <h6 class="mb-0">{{ entry.student.first_name }} {{ entry.student.last_name }}</h6>
+                                                <small class="text-muted">{{ entry.student.student_id }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <strong>${{ entry.total_amount|floatformat:2 }}</strong>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="text-success fw-bold">${{ entry.paid_amount|floatformat:2 }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="text-danger fw-bold">${{ entry.unpaid_amount|floatformat:2 }}</span>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <a href="{% url 'student_months' student_id=entry.student.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();"
+                                               data-bs-toggle="tooltip" data-bs-placement="top" 
+                                               title="View monthly billing details">
+                                                <i class="fas fa-calendar me-1"></i> View Months
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
                     {% else %}
                     <div class="text-center py-5">
                         <div class="text-muted">
@@ -161,4 +280,264 @@
         </div>
     </div>
 </div>
+
+<!-- Mass Add Bills Modal -->
+<div class="modal fade" id="massAddBillsModal" tabindex="-1" aria-labelledby="massAddBillsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'mass_add_bills' %}" id="massAddBillsForm">
+                {% csrf_token %}
+                <input type="hidden" name="student_ids" id="massStudentIds">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="massAddBillsModalLabel">Add Bills to Selected Students</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This will add the same bill to <span id="selectedStudentsCount">0</span> selected student(s).
+                    </div>
+                    <div class="mb-3">
+                        <label for="mass_description" class="form-label">Description <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="mass_description" name="description" required
+                               placeholder="e.g., Monthly Tuition, Activity Fee, etc.">
+                    </div>
+                    <div class="mb-3">
+                        <label for="mass_amount" class="form-label">Amount <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="mass_amount" name="amount" step="0.01" min="0" required
+                                   placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mass_due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="mass_due_date" name="due_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="mass_show_in_payment_history" name="show_in_payment_history" checked>
+                            <label class="form-check-label" for="mass_show_in_payment_history">
+                                Show in payment history
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBillsBtn">
+                        <span class="loading-spinner"></span>
+                        <span class="btn-text">
+                            <i class="fas fa-plus me-1"></i> Add Bills
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: white;">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="mt-2">Processing...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedStudents = new Set();
+let isLoading = false;
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Set default due date to next month
+    const today = new Date();
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const formattedDate = nextMonth.toISOString().split('T')[0];
+    document.getElementById('mass_due_date').value = formattedDate;
+    
+    // Handle mass add bills modal
+    const massAddBillsModal = document.getElementById('massAddBillsModal');
+    if (massAddBillsModal) {
+        massAddBillsModal.addEventListener('show.bs.modal', function() {
+            const studentIds = Array.from(selectedStudents);
+            document.getElementById('massStudentIds').value = studentIds.join(',');
+            document.getElementById('selectedStudentsCount').textContent = studentIds.length;
+            
+            if (studentIds.length === 0) {
+                alert('Please select at least one student first.');
+                return false;
+            }
+        });
+    }
+    
+    // Handle form submission with loading state
+    const massAddBillsForm = document.getElementById('massAddBillsForm');
+    if (massAddBillsForm) {
+        massAddBillsForm.addEventListener('submit', function(e) {
+            if (isLoading) {
+                e.preventDefault();
+                return;
+            }
+            
+            setLoadingState(true);
+            const submitBtn = document.getElementById('submitBillsBtn');
+            submitBtn.classList.add('loading');
+        });
+    }
+});
+
+function handleRowClick(event, studentId) {
+    // Don't trigger if clicking on checkbox or action button
+    if (event.target.type === 'checkbox' || event.target.closest('.btn')) {
+        return;
+    }
+    
+    // Toggle checkbox
+    const checkbox = event.target.closest('tr').querySelector('.student-checkbox');
+    checkbox.checked = !checkbox.checked;
+    updateSelection();
+}
+
+function updateSelection() {
+    selectedStudents.clear();
+    const checkboxes = document.querySelectorAll('.student-checkbox:checked');
+    checkboxes.forEach(checkbox => {
+        selectedStudents.add(checkbox.value);
+    });
+    
+    document.getElementById('selectedCount').textContent = selectedStudents.size;
+    
+    // Update button states
+    const addBillBtn = document.getElementById('addBillBtn');
+    const sendReminderBtn = document.getElementById('sendReminderBtn');
+    
+    if (selectedStudents.size > 0) {
+        document.getElementById('massActionsBar').classList.add('show');
+        addBillBtn.disabled = false;
+        sendReminderBtn.disabled = false;
+    } else {
+        document.getElementById('massActionsBar').classList.remove('show');
+        addBillBtn.disabled = true;
+        sendReminderBtn.disabled = true;
+    }
+}
+
+function selectAll() {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateSelection();
+}
+
+function selectNone() {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateSelection();
+}
+
+function clearSelection() {
+    selectNone();
+}
+
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    updateSelection();
+}
+
+function setLoadingState(loading) {
+    isLoading = loading;
+    const overlay = document.getElementById('loadingOverlay');
+    
+    if (loading) {
+        overlay.style.display = 'block';
+    } else {
+        overlay.style.display = 'none';
+    }
+}
+
+function sendMassReminders() {
+    if (selectedStudents.size === 0) {
+        alert('Please select at least one student.');
+        return;
+    }
+    
+    if (isLoading) {
+        return;
+    }
+    
+    if (confirm('Send bill reminders to ' + selectedStudents.size + ' selected student(s)?')) {
+        setLoadingState(true);
+        
+        const sendReminderBtn = document.getElementById('sendReminderBtn');
+        sendReminderBtn.classList.add('loading');
+        
+        const form = document.getElementById('massActionForm');
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'send_reminders';
+        
+        const studentsInput = document.createElement('input');
+        studentsInput.type = 'hidden';
+        studentsInput.name = 'student_ids';
+        studentsInput.value = Array.from(selectedStudents).join(',');
+        
+        form.appendChild(actionInput);
+        form.appendChild(studentsInput);
+        form.action = "/mass-billing-actions/";
+        
+        // Submit form and handle response
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                throw new Error('Network response was not ok');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while sending reminders. Please try again.');
+            setLoadingState(false);
+            sendReminderBtn.classList.remove('loading');
+        });
+    }
+}
+
+// Handle page unload to prevent multiple submissions
+window.addEventListener('beforeunload', function(e) {
+    if (isLoading) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+</script>
 {% endblock %} 
