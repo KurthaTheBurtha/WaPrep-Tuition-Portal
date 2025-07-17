@@ -4,76 +4,22 @@
 {% block content %}
 
 <div class="container-fluid py-4">
-    <!-- Summary Cards -->
-    <div class="row mb-2">
-        <!-- Total Amount Owed Card -->
-        <div class="col-12 col-md-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-dollar-sign text-danger fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Total Amount Owed</h6>
-                            <h2 class="card-title mb-0">${{ total_amount_owed|floatformat:2 }}</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Ask a Question Card -->
-        <div class="col-12 col-md-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-question-circle text-primary fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Need Help?</h6>
-                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#askQuestionModal">
-                                Ask a Question
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Add Payment Method Card -->
-        <div class="col-12 col-md-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-credit-card text-success fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Payment Methods</h6>
-                            <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success btn-sm">
-                                Add Payment Method
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <!-- My Students Section -->
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-body">
+                    <h4 class="mb-4">My Students</h4>
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Student</th>
-                                    <th>Tuition/Boarding</th>
-                                    <th>Upcoming Payment</th>
                                     <th>Past Due</th>
+                                    <th>Due By Due Date</th>
                                     <th>Due Date</th>
-                                    <th class="text-end">Action</th>
+                                    <th style="text-align: center;">View Upcoming Bills</th>
+                                    <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -88,47 +34,49 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-bold">${{ student.total_due|floatformat:2 }}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-bold">${{ student.monthly_due|floatformat:2 }}</span>
-                                            {% if student.current_month_items %}
-                                            <small class="text-muted">
-                                                {{ student.current_month_items.count }} item{{ student.current_month_items.count|pluralize }}
-                                            </small>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% if student.overdue_items %}
-                                            <ul class="list-unstyled mb-0">
-                                                {% for item in student.overdue_items %}
-                                                    <li>
-                                                        <span class="text-danger">{{ item.description }}</span>:
-                                                        ${{ item.amount|floatformat:2 }}
-                                                        <!-- <small class="text-muted">(Due {{ item.due_date|date:"M d, Y" }})</small> -->
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
+                                        {% if student.overdue_amount > 0 %}
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold text-danger">${{ student.overdue_amount|floatformat:2 }}</span>
+                                                <small class="text-muted">
+                                                    {{ student.overdue_count }} item{{ student.overdue_count|pluralize }}
+                                                </small>
+                                            </div>
                                         {% else %}
                                             <span class="text-muted">No overdue items</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% with next_due=student.current_month_items.first.due_date %}
-                                        {% if next_due %}
-                                            {{ next_due|date:"M d, Y" }}
+                                        {% if student.upcoming_amount > 0 %}
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold">${{ student.upcoming_amount|floatformat:2 }}</span>
+                                                <small class="text-muted">
+                                                    {{ student.upcoming_count }} item{{ student.upcoming_count|pluralize }}
+                                                </small>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">No upcoming items</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if student.next_due_date %}
+                                            {{ student.next_due_date|date:"M d, Y" }}
                                         {% else %}
                                             <span class="text-muted">No due date</span>
                                         {% endif %}
-                                        {% endwith %}
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <a href="{% url 'payer_upcoming_bills' student.id %}" class="btn btn-sm" style="background-color: #007bff; border-color: #007bff; color: white; text-decoration: none;">
+                                            View
+                                        </a>
                                     </td>
                                     <td class="text-end">
+                                        {% if student.overdue_amount > 0 %}
+                                            <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger me-1">
+                                                <i class="fas fa-exclamation-triangle me-1"></i> Pay Overdue
+                                            </a>
+                                        {% endif %}
                                         <a href="{% url 'payment' student.id %}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-credit-card me-1"></i> Pay
+                                            <i class="fas fa-credit-card me-1"></i> Pay Upcoming
                                         </a>
                                     </td>
                                 </tr>
@@ -147,6 +95,46 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="row mt-4">
+        <!-- Ask a Question Card -->
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-question-circle text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Need Help?</h6>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#askQuestionModal">
+                                Ask a Question
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Add Payment Method Card -->
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-credit-card text-success fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Payment Methods</h6>
+                            <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success btn-sm">
+                                Add Payment Method
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -180,11 +168,11 @@
                                 <label class="form-check-label" for="student_{{ student.id }}">
                                     {{ student.first_name }} {{ student.last_name }}
                                     <small class="text-muted d-block">
-                                        Total Due: ${{ student.total_due|floatformat:2 }} | 
-                                        {{ current_month }} Due: ${{ student.monthly_due|floatformat:2 }}
-                                        {% if student.current_month_items %}
+                                        Past Due: ${{ student.overdue_amount|floatformat:2 }} | 
+                                        Upcoming: ${{ student.upcoming_amount|floatformat:2 }}
+                                        {% if student.next_due_date %}
                                         <br>
-                                        Next Due: {{ student.current_month_items.first.due_date|date:"M d, Y" }}
+                                        Next Due: {{ student.next_due_date|date:"M d, Y" }}
                                         {% endif %}
                                     </small>
                                 </label>

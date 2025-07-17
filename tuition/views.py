@@ -103,15 +103,60 @@ def payment(request, student_id):
         messages.error(request, 'You are not authorized to make payments for this student.')
         return redirect('payer_dashboard')
     
-    now = timezone.now()
-    current_month = now.month
-    current_year = now.year
-    breakdown_items = PaymentBreakdown.objects.filter(
-        student=student,
-        is_paid=False,
-        due_date__year=current_year,
-        due_date__month=current_month
-    ).order_by('due_date')
+    # Check for specific bill_id, month, or overdue parameters
+    bill_id = request.GET.get('bill_id')
+    month_param = request.GET.get('month')
+    overdue_param = request.GET.get('overdue')
+    
+    if bill_id:
+        # Show specific bill
+        try:
+            breakdown_items = PaymentBreakdown.objects.filter(
+                id=bill_id,
+                student=student,
+                is_paid=False
+            ).order_by('due_date')
+        except PaymentBreakdown.DoesNotExist:
+            breakdown_items = PaymentBreakdown.objects.none()
+    elif month_param:
+        # Show all unpaid bills for specific month
+        try:
+            year, month = month_param.split('-')
+            year = int(year)
+            month = int(month)
+            
+            from datetime import date
+            first_day = date(year, month, 1)
+            if month == 12:
+                last_day = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                last_day = date(year, month + 1, 1) - timedelta(days=1)
+            
+            breakdown_items = PaymentBreakdown.objects.filter(
+                student=student,
+                is_paid=False,
+                due_date__gte=first_day,
+                due_date__lte=last_day
+            ).order_by('due_date')
+        except (ValueError, IndexError):
+            breakdown_items = PaymentBreakdown.objects.none()
+    elif overdue_param:
+        # Show all overdue bills
+        today = timezone.now().date()
+        breakdown_items = PaymentBreakdown.objects.filter(
+            student=student,
+            is_paid=False,
+            late_date__lt=today
+        ).order_by('due_date')
+    else:
+        # Default: show all upcoming bills (not overdue)
+        today = timezone.now().date()
+        breakdown_items = PaymentBreakdown.objects.filter(
+            student=student,
+            is_paid=False,
+            late_date__gte=today
+        ).order_by('due_date')
+    
     total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
     
     # Stripe integration
@@ -135,14 +180,35 @@ def payment(request, student_id):
     else:
         client_secret = None
     
+    # Determine what we're paying for
+    if bill_id:
+        payment_description = f"Payment for specific bill"
+    elif month_param:
+        try:
+            year, month = month_param.split('-')
+            year = int(year)
+            month = int(month)
+            from datetime import date
+            first_day = date(year, month, 1)
+            payment_description = f"Payment for {first_day.strftime('%B %Y')}"
+        except (ValueError, IndexError):
+            payment_description = "Payment for selected items"
+    elif overdue_param:
+        payment_description = "Payment for overdue bills"
+    else:
+        payment_description = "Payment for upcoming bills"
+    
     context = {
         'student_name': f"{student.first_name} {student.last_name}",
         'total_amount_due': total_amount_due,
         'breakdown_items': breakdown_items,
         'student_id': student_id,
-        'current_month': now.strftime('%B %Y'),
+        'payment_description': payment_description,
         'STRIPE_PUBLISHABLE_KEY': stripe_publishable_key,
         'STRIPE_CLIENT_SECRET': client_secret,
+        'bill_id': bill_id,
+        'month_param': month_param,
+        'overdue_param': overdue_param,
     }
     return render(request, 'payment.html', context)
 
@@ -192,16 +258,57 @@ def process_payment(request):
             if payment_intent.status == 'succeeded':
                 # Payment was successful, now create database records
                 
-                # Get current month's payment items
-                now = timezone.now()
-                current_month = now.month
-                current_year = now.year
-                payment_items = PaymentBreakdown.objects.filter(
-                    student=student,
-                    is_paid=False,
-                    due_date__year=current_year,
-                    due_date__month=current_month
-                )
+                # Get the bills that were actually being paid for
+                # This should match the same filtering logic as the payment view
+                bill_id = request.POST.get('bill_id')
+                month_param = request.POST.get('month')
+                overdue_param = request.POST.get('overdue')
+                
+                if bill_id:
+                    # Specific bill payment
+                    payment_items = PaymentBreakdown.objects.filter(
+                        id=bill_id,
+                        student=student,
+                        is_paid=False
+                    )
+                elif month_param:
+                    # Month payment
+                    try:
+                        year, month = month_param.split('-')
+                        year = int(year)
+                        month = int(month)
+                        
+                        from datetime import date
+                        first_day = date(year, month, 1)
+                        if month == 12:
+                            last_day = date(year + 1, 1, 1) - timedelta(days=1)
+                        else:
+                            last_day = date(year, month + 1, 1) - timedelta(days=1)
+                        
+                        payment_items = PaymentBreakdown.objects.filter(
+                            student=student,
+                            is_paid=False,
+                            due_date__gte=first_day,
+                            due_date__lte=last_day
+                        )
+                    except (ValueError, IndexError):
+                        payment_items = PaymentBreakdown.objects.none()
+                elif overdue_param:
+                    # Overdue payment
+                    today = timezone.now().date()
+                    payment_items = PaymentBreakdown.objects.filter(
+                        student=student,
+                        is_paid=False,
+                        late_date__lt=today
+                    )
+                else:
+                    # Default: all upcoming bills (not overdue)
+                    today = timezone.now().date()
+                    payment_items = PaymentBreakdown.objects.filter(
+                        student=student,
+                        is_paid=False,
+                        late_date__gte=today
+                    )
                 
                 # Create payment record only after confirming success
                 payment = Payment.objects.create(
@@ -1292,47 +1399,46 @@ def payer_dashboard(request):
 
     # Get current month and year using system datetime instead of Django timezone
     # Django timezone.now() seems to be showing incorrect date
-    from datetime import datetime
+    from datetime import datetime, timedelta
+    import calendar
     current_date = datetime.now()
     current_month = current_date.month
     current_year = current_date.year
     today = current_date.date()
 
+    # Calculate the last day of the current month
+    last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+    end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+
     # Calculate total amount owed and get payment breakdowns
     total_amount_owed = 0
-    current_month_total = 0
     
     for student in my_students:
         # Get all unpaid payment breakdown items
         breakdown_items = student.payment_breakdowns.filter(is_paid=False)
-        # Get current month's items
-        current_month_items = breakdown_items.filter(
-            due_date__month=current_month,
-            due_date__year=current_year
-        )
-        # Get overdue items
-        overdue_items = breakdown_items.filter(due_date__lt=today)
+        
+        # Get overdue items (past late_date)
+        overdue_items = breakdown_items.filter(late_date__lt=today)
         student.overdue_items = overdue_items
-        # Calculate tuition/boarding total (case-insensitive search)
-        tuition_boarding_items = breakdown_items.filter(
-            models.Q(description__icontains='tuition') | models.Q(description__icontains='boarding')
-        )
-        tuition_boarding_total = tuition_boarding_items.aggregate(total=Sum('amount'))['total'] or 0
-        student.total_due = tuition_boarding_total
-        # Calculate other totals
-        student_month_total = current_month_items.aggregate(total=Sum('amount'))['total'] or 0
-        total_amount_owed += tuition_boarding_total
-        current_month_total += student_month_total
-        # Add breakdown items to student object for template access
-        student.breakdown_items = breakdown_items
-        student.current_month_items = current_month_items
-        student.monthly_due = student_month_total
+        student.overdue_amount = overdue_items.aggregate(total=Sum('amount'))['total'] or 0
+        student.overdue_count = overdue_items.count()
+        
+        # Get upcoming items (not overdue, due by due date)
+        # Include all unpaid bills that are not overdue (due by their due date)
+        upcoming_items = breakdown_items.filter(late_date__gte=today)
+        student.upcoming_items = upcoming_items
+        student.upcoming_amount = upcoming_items.aggregate(total=Sum('amount'))['total'] or 0
+        student.upcoming_count = upcoming_items.count()
+        
+        # Set due date to end of current month
+        student.next_due_date = end_of_month
+        
+        # Calculate total amount owed
+        total_amount_owed += student.overdue_amount + student.upcoming_amount
     
     context = {
         'my_students': my_students,
         'total_amount_owed': total_amount_owed,
-        'current_month_total': current_month_total,
-        'current_month': current_date.strftime('%B %Y'),
     }
     return render(request, 'payer_dashboard.html', context)
 
@@ -1480,6 +1586,61 @@ def inline_edit_student_field(request):
     
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
+
+@login_required
+def inline_edit_payer_field(request):
+    """Handle inline editing of payer fields via AJAX"""
+    if request.user.user_type != 'admin':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    
+    if request.method == 'POST':
+        student_payer_id = request.POST.get('student_payer_id')
+        field_name = request.POST.get('field_name')
+        field_value = request.POST.get('field_value')
+        is_primary = request.POST.get('is_primary')
+        
+        try:
+            student_payer = get_object_or_404(StudentPayer, id=student_payer_id)
+            
+            # Validate field name
+            allowed_fields = ['first_name', 'last_name', 'email', 'relationship']
+            if field_name not in allowed_fields:
+                return JsonResponse({'error': 'Invalid field'}, status=400)
+            
+            if field_name in ['first_name', 'last_name']:
+                # Update the payer's name
+                payer = student_payer.payer
+                setattr(payer, field_name, field_value)
+                payer.save()
+                display_value = f"{payer.first_name} {payer.last_name}"
+                
+            elif field_name == 'email':
+                # Update the payer's email
+                payer = student_payer.payer
+                payer.email = field_value
+                payer.save()
+                display_value = field_value
+                
+            elif field_name == 'relationship':
+                # Update the relationship
+                student_payer.relationship = field_value
+                student_payer.save()
+                display_value = student_payer.get_relationship_display()
+                
+            else:
+                return JsonResponse({'error': 'Invalid field'}, status=400)
+                
+            return JsonResponse({
+                'success': True,
+                'display_value': display_value,
+                'message': f'{field_name.replace("_", " ").title()} updated successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
 @login_required
 def monthly_bills(request, student_id, month_key):
     if request.user.user_type != 'admin':
@@ -1512,7 +1673,27 @@ def monthly_bills(request, student_id, month_key):
     bills = student.payment_breakdowns.filter(
         due_date__gte=first_day,
         due_date__lte=last_day
-    ).order_by('due_date')
+    )
+    
+    # Convert to list and sort by overdue status
+    bills_list = list(bills)
+    from django.utils import timezone
+    today = timezone.now().date()
+    
+    def sort_key(bill):
+        # Overdue bills go first (priority 0)
+        if bill.late_date and bill.late_date < today and not bill.is_paid:
+            days_overdue = (today - bill.late_date).days
+            return (0, -days_overdue, bill.due_date or today)  # Negative for reverse sort
+        
+        # Current unpaid bills go second (priority 1)
+        if not bill.is_paid:
+            return (1, 0, bill.due_date or today)
+        
+        # Paid bills go last (priority 2)
+        return (2, 0, bill.due_date or today)
+    
+    bills_list.sort(key=sort_key)
     
     # Calculate totals
     total_amount = bills.aggregate(total=models.Sum('amount'))['total'] or 0
@@ -1528,6 +1709,8 @@ def monthly_bills(request, student_id, month_key):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            date_incurred = request.POST.get('date_incurred')
+            late_date = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
             try:
                 PaymentBreakdown.objects.create(
@@ -1535,6 +1718,8 @@ def monthly_bills(request, student_id, month_key):
                     description=description,
                     amount=amount,
                     due_date=due_date,
+                    date_incurred=date_incurred if date_incurred else None,
+                    late_date=late_date if late_date else None,
                     is_paid=is_paid,
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
@@ -1546,6 +1731,8 @@ def monthly_bills(request, student_id, month_key):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            date_incurred = request.POST.get('date_incurred')
+            late_date = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
             show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
@@ -1553,6 +1740,8 @@ def monthly_bills(request, student_id, month_key):
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
+                bill.date_incurred = date_incurred if date_incurred else None
+                bill.late_date = late_date if late_date else None
                 bill.is_paid = is_paid
                 bill.show_in_payment_history = show_in_payment_history
                 bill.save()
@@ -1645,7 +1834,7 @@ def monthly_bills(request, student_id, month_key):
         'student': student,
         'month_key': month_key,
         'month_display': month_display,
-        'bills': bills,
+        'bills': bills_list,
         'payments': payments,
         'student_payers': student_payers,
         'total_amount': total_amount,
@@ -2076,16 +2265,19 @@ def student_bills(request, student_id):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            date_incurred = request.POST.get('date_incurred')
+            late_date = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
-            show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
                     amount=amount,
                     due_date=due_date,
+                    date_incurred=date_incurred if date_incurred else None,
+                    late_date=late_date if late_date else None,
                     is_paid=is_paid,
-                    show_in_payment_history=show_in_payment_history
+                    show_in_payment_history=True  # Always show in payment history for new bills
                 )
                 messages.success(request, 'Bill added successfully.')
             except Exception as e:
@@ -2095,6 +2287,8 @@ def student_bills(request, student_id):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            date_incurred = request.POST.get('date_incurred')
+            late_date = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
             show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
@@ -2102,6 +2296,8 @@ def student_bills(request, student_id):
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
+                bill.date_incurred = date_incurred if date_incurred else None
+                bill.late_date = late_date if late_date else None
                 bill.is_paid = is_paid
                 bill.show_in_payment_history = show_in_payment_history
                 bill.save()
@@ -2993,4 +3189,106 @@ WAPrep Administration
             messages.error(request, 'Invalid action specified.')
     
     return redirect('manage_billing')
+
+@login_required
+def payer_view_upcoming_bills(request, student_id):
+    """View for payers to see upcoming bills by month for a specific student"""
+    if request.user.user_type != 'payer':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    
+    # Check if the payer is associated with this student
+    try:
+        student_payer = StudentPayer.objects.get(student_id=student_id, payer=request.user)
+    except StudentPayer.DoesNotExist:
+        messages.error(request, 'You do not have access to this student.')
+        return redirect('payer_dashboard')
+    
+    student = get_object_or_404(Student, id=student_id)
+    
+    # Define the billing cycle: June 2025 to May 2026
+    import calendar
+    billing_cycle_months = []
+    
+    # Add June 2025 to December 2025
+    for month in range(6, 13):  # June (6) to December (12)
+        month_key = f"2025-{month:02d}"
+        month_display = f"{calendar.month_name[month]} 2025"
+        billing_cycle_months.append((month_key, month_display))
+    
+    # Add January 2026 to May 2026
+    for month in range(1, 6):  # January (1) to May (5)
+        month_key = f"2026-{month:02d}"
+        month_display = f"{calendar.month_name[month]} 2026"
+        billing_cycle_months.append((month_key, month_display))
+
+    # Get all bills for this student with due dates
+    all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('due_date')
+    
+    # Group bills by month
+    monthly_billing = {}
+    for bill in all_bills:
+        month_key = bill.due_date.strftime('%Y-%m')
+        month_display = bill.due_date.strftime('%B %Y')
+        if month_key not in monthly_billing:
+            monthly_billing[month_key] = {
+                'month_display': month_display,
+                'month_key': month_key,
+                'bills': [],
+                'total_amount': 0,
+                'paid_amount': 0,
+                'unpaid_amount': 0,
+                'total_bills': 0,
+                'paid_bills': 0,
+                'unpaid_bills': 0
+            }
+        monthly_billing[month_key]['bills'].append(bill)
+        monthly_billing[month_key]['total_amount'] += bill.amount
+        monthly_billing[month_key]['total_bills'] += 1
+        if bill.is_paid:
+            monthly_billing[month_key]['paid_amount'] += bill.amount
+            monthly_billing[month_key]['paid_bills'] += 1
+        else:
+            monthly_billing[month_key]['unpaid_amount'] += bill.amount
+            monthly_billing[month_key]['unpaid_bills'] += 1
+
+    # Create the final sorted months list in billing cycle order
+    sorted_months = []
+    for month_key, month_display in billing_cycle_months:
+        if month_key in monthly_billing:
+            # Month has bills, use existing data
+            sorted_months.append((month_key, monthly_billing[month_key]))
+        else:
+            # Month has no bills, create empty entry
+            sorted_months.append((month_key, {
+                'month_display': month_display,
+                'month_key': month_key,
+                'bills': [],
+                'total_amount': 0,
+                'paid_amount': 0,
+                'unpaid_amount': 0,
+                'total_bills': 0,
+                'paid_bills': 0,
+                'unpaid_bills': 0
+            }))
+    
+    # Calculate student totals
+    total_bills = all_bills.count()
+    total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+    paid_bills = all_bills.filter(is_paid=True).count()
+    unpaid_bills = all_bills.filter(is_paid=False).count()
+    paid_amount = all_bills.filter(is_paid=True).aggregate(total=models.Sum('amount'))['total'] or 0
+    unpaid_amount = all_bills.filter(is_paid=False).aggregate(total=models.Sum('amount'))['total'] or 0
+    
+    context = {
+        'student': student,
+        'monthly_billing': sorted_months,
+        'total_bills': total_bills,
+        'total_amount': total_amount,
+        'paid_bills': paid_bills,
+        'unpaid_bills': unpaid_bills,
+        'paid_amount': paid_amount,
+        'unpaid_amount': unpaid_amount,
+    }
+    return render(request, 'payer_upcoming_bills.html', context)
 

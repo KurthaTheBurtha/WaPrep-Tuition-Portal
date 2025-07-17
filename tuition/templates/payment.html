@@ -5,17 +5,65 @@
 <div class="container mt-4">
     <div class="card">
         <div class="card-header">
-            <h4 class="mb-0">Payment Details for {{ current_month }}</h4>
+            <h4 class="mb-0">{{ payment_description }}</h4>
         </div>
         <div class="card-body">
-            <div class="payment-summary mb-4">
-                <h5>Payment Summary</h5>
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>Student:</strong> {{ student_name }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>Total Amount Due:</strong> ${{ total_amount_due|floatformat:2 }}</p>
+
+
+            <!-- No Fees Information Box -->
+            <div class="no-fees-info mb-4">
+                <div class="accordion" id="feesAccordion">
+                    <div class="accordion-item border-success">
+                        <h2 class="accordion-header" id="feesHeading">
+                            <button class="accordion-button collapsed bg-success text-white" type="button" data-bs-toggle="collapse" data-bs-target="#feesCollapse" aria-expanded="false" aria-controls="feesCollapse">
+                                <i class="fas fa-check-circle me-2"></i>Payment Processing Information
+                            </button>
+                        </h2>
+                        <div id="feesCollapse" class="accordion-collapse collapse" aria-labelledby="feesHeading" data-bs-parent="#feesAccordion">
+                            <div class="accordion-body">
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-8">
+                                                <div class="fee-info mb-2">
+                                                    <h6 class="text-success mb-2">
+                                                        <i class="fas fa-check-circle me-1"></i>We Cover All Processing Fees
+                                                    </h6>
+                                                    <p class="mb-2">
+                                                        Washington Preparatory School covers all payment processing fees, ensuring you pay exactly the amount due with no additional charges. We believe in transparent, straightforward billing for the families.
+                                                    </p>
+                                                    <div class="fee-benefits">
+                                                        <div class="benefit-item d-flex align-items-center mb-1">
+                                                            <i class="fas fa-check text-success me-2"></i>
+                                                            <span class="small">No processing fees added to your payment</span>
+                                                        </div>
+                                                        <div class="benefit-item d-flex align-items-center mb-1">
+                                                            <i class="fas fa-university text-success me-2"></i>
+                                                            <span class="small">Bank account payments preferred (reduces the costs)</span>
+                                                        </div>
+                                                        <div class="benefit-item d-flex align-items-center">
+                                                            <i class="fas fa-handshake text-success me-2"></i>
+                                                            <span class="small">Helps us maintain affordable tuition rates</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="savings-section text-center">
+                                                    <div class="savings-icon mb-2">
+                                                        <i class="fas fa-chart-line fa-lg text-success"></i>
+                                                    </div>
+                                                    <h6 class="text-success mb-1">Cost Efficiency</h6>
+                                                    <p class="small text-muted mb-0">
+                                                        Bank account payments reduce the processing costs by approximately 70%, allowing us to invest more in your child's education.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -43,7 +91,7 @@
                                 <td colspan="3" class="text-center py-4">
                                     <div class="text-muted">
                                         <i class="fas fa-check-circle fa-2x mb-2"></i>
-                                        <p class="mb-0">No payments due for {{ current_month }}</p>
+                                        <p class="mb-0">No payments due for this selection</p>
                                     </div>
                                 </td>
                             </tr>
@@ -59,105 +107,72 @@
                 </div>
             </div>
 
-            {% if breakdown_items and STRIPE_CLIENT_SECRET %}
-            
-            <!-- No Fees Information Box -->
-            <div class="no-fees-info mb-3">
-                <div class="card border-success">
-                    <div class="card-header bg-success text-white">
-                        <h6 class="mb-0">
-                            <i class="fas fa-check-circle me-2"></i>Payment Processing Information
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <div class="fee-info mb-2">
-                                    <h6 class="text-success mb-2">
-                                        <i class="fas fa-check-circle me-1"></i>We Cover All Processing Fees
-                                    </h6>
-                                    <p class="mb-2">
-                                        Washington Preparatory School covers all payment processing fees, ensuring you pay exactly the amount due with no additional charges. We believe in transparent, straightforward billing for the families.
-                                    </p>
-                                    <div class="fee-benefits">
-                                        <div class="benefit-item d-flex align-items-center mb-1">
-                                            <i class="fas fa-check text-success me-2"></i>
-                                            <span class="small">No processing fees added to your payment</span>
-                                        </div>
-                                        <div class="benefit-item d-flex align-items-center mb-1">
-                                            <i class="fas fa-university text-success me-2"></i>
-                                            <span class="small">Bank account payments preferred (reduces the costs)</span>
-                                        </div>
-                                        <div class="benefit-item d-flex align-items-center">
-                                            <i class="fas fa-handshake text-success me-2"></i>
-                                            <span class="small">Helps us maintain affordable tuition rates</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="savings-section text-center">
-                                    <div class="savings-icon mb-2">
-                                        <i class="fas fa-chart-line fa-lg text-success"></i>
-                                    </div>
-                                    <h6 class="text-success mb-1">Cost Efficiency</h6>
-                                    <p class="small text-muted mb-0">
-                                        Bank account payments reduce the processing costs by approximately 70%, allowing us to invest more in your child's education.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <!-- Secure Payment Information -->
             <div class="payment-info mb-4">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="mb-0">
-                            <i class="fas fa-shield-alt me-2"></i>Secure Payment Processing
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="security-info">
-                            <h6 class="text-primary mb-2">
-                                <i class="fas fa-lock me-1"></i>Secure Payment Processing
-                            </h6>
-                            <p class="mb-2 small">
-                                You can pay with credit/debit cards or US bank accounts. 
-                                All payment information is securely handled by Stripe, 
-                                a PCI Service Provider Level 1 certified payment processor.
-                            </p>
-                            <div class="security-features">
-                                <span class="badge bg-success me-1 mb-1">
-                                    <i class="fas fa-check me-1"></i>Encrypted
-                                </span>
-                                <span class="badge bg-success me-1 mb-1">
-                                    <i class="fas fa-check me-1"></i>PCI Compliant
-                                </span>
-                                <span class="badge bg-success me-1 mb-1">
-                                    <i class="fas fa-check me-1"></i>Secure
-                                </span>
-                            </div>
-                            <div class="privacy-link mt-2">
-                                <small class="text-muted">
-                                    <i class="fas fa-shield-alt me-1"></i>
-                                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                                        View Stripe's Privacy Policy
-                                    </a>
-                                </small>
+                <div class="accordion" id="securityAccordion">
+                    <div class="accordion-item border-primary">
+                        <h2 class="accordion-header" id="securityHeading">
+                            <button class="accordion-button collapsed bg-primary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#securityCollapse" aria-expanded="false" aria-controls="securityCollapse">
+                                <i class="fas fa-shield-alt me-2"></i>Secure Payment Processing
+                            </button>
+                        </h2>
+                        <div id="securityCollapse" class="accordion-collapse collapse" aria-labelledby="securityHeading" data-bs-parent="#securityAccordion">
+                            <div class="accordion-body">
+                                <div class="card border-primary">
+                                    <div class="card-body">
+                                        <div class="security-info">
+                                            <h6 class="text-primary mb-2">
+                                                <i class="fas fa-lock me-1"></i>Secure Payment Processing
+                                            </h6>
+                                            <p class="mb-2 small">
+                                                You can pay with credit/debit cards or US bank accounts. 
+                                                All payment information is securely handled by Stripe, 
+                                                a PCI Service Provider Level 1 certified payment processor.
+                                            </p>
+                                            <div class="security-features">
+                                                <span class="badge bg-success me-1 mb-1">
+                                                    <i class="fas fa-check me-1"></i>Encrypted
+                                                </span>
+                                                <span class="badge bg-success me-1 mb-1">
+                                                    <i class="fas fa-check me-1"></i>PCI Compliant
+                                                </span>
+                                                <span class="badge bg-success me-1 mb-1">
+                                                    <i class="fas fa-check me-1"></i>Secure
+                                                </span>
+                                            </div>
+                                            <div class="privacy-link mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-shield-alt me-1"></i>
+                                                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                                                        View Stripe's Privacy Policy
+                                                    </a>
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {% if breakdown_items and STRIPE_CLIENT_SECRET %}
+            
             <form id="stripe-payment-form" method="post" action="{% url 'process_payment' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" value="{{ student_id }}">
                 <input type="hidden" name="amount" value="{{ total_amount_due }}">
                 <input type="hidden" name="payment_intent_id" id="payment_intent_id">
+                {% if bill_id %}
+                <input type="hidden" name="bill_id" value="{{ bill_id }}">
+                {% endif %}
+                {% if month_param %}
+                <input type="hidden" name="month" value="{{ month_param }}">
+                {% endif %}
+                {% if overdue_param %}
+                <input type="hidden" name="overdue" value="{{ overdue_param }}">
+                {% endif %}
                 
                 <div class="mb-3">
                     <div id="payment-element" class="form-control"></div>

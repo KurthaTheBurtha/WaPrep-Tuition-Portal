@@ -147,6 +147,8 @@
                                     <tr>
                                         <th class="border-0 ps-4">Description</th>
                                         <th class="border-0">Due Date</th>
+                                        <th class="border-0">Date Incurred</th>
+                                        <th class="border-0">Late Date</th>
                                         <th class="border-0 text-end">Amount</th>
                                         <th class="border-0 text-center">Status</th>
                                         <th class="border-0 text-end pe-4">Actions</th>
@@ -161,15 +163,21 @@
                                         data-bill-description="{{ bill.description }}"
                                         data-bill-amount="{{ bill.amount }}"
                                         data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
+                                        data-bill-date-incurred="{{ bill.date_incurred|date:'Y-m-d' }}"
+                                        data-bill-late-date="{{ bill.late_date|date:'Y-m-d' }}"
                                         data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}">
                                         <td class="ps-4">{{ bill.description }}</td>
                                         <td>{{ bill.due_date|date:"M d, Y" }}</td>
+                                        <td>{{ bill.date_incurred|date:"M d, Y" }}</td>
+                                        <td>{{ bill.late_date|date:"M d, Y" }}</td>
                                         <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
                                         <td class="text-center">
                                             {% if bill.is_paid %}
                                                 <span class="badge bg-success">Paid</span>
+                                            {% elif bill.is_overdue %}
+                                                <span class="badge bg-danger">Overdue</span>
                                             {% else %}
-                                                <span class="badge bg-danger">Unpaid</span>
+                                                <span class="badge bg-warning">Unpaid</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-end pe-4">
@@ -181,6 +189,8 @@
                                                     data-bill-description="{{ bill.description }}"
                                                     data-bill-amount="{{ bill.amount }}"
                                                     data-bill-due-date="{{ bill.due_date|date:'Y-m-d' }}"
+                                                    data-bill-date-incurred="{{ bill.date_incurred|date:'Y-m-d' }}"
+                                                    data-bill-late-date="{{ bill.late_date|date:'Y-m-d' }}"
                                                     data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}">
                                                 <i class="fas fa-edit me-1"></i> Edit
                                             </button>
@@ -394,10 +404,21 @@
                             <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01" required 
                                    placeholder="0.00">
                         </div>
+                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
                         <input type="date" name="due_date" id="due_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="late_date" class="form-label">Late Date</label>
+                        <input type="date" name="late_date" id="late_date" class="form-control">
+                        <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -444,12 +465,23 @@
                             <input type="number" name="amount" id="edit_amount" class="form-control" step="0.01" min="0" required 
                                    placeholder="0.00">
                         </div>
+                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="edit_due_date" class="form-label">Due Date</label>
                         <input type="date" name="due_date" id="edit_due_date" class="form-control" 
                                min="{{ first_day|date:'Y-m-d' }}" max="{{ last_day|date:'Y-m-d' }}" required>
                         <div class="form-text">Must be within {{ month_display }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="edit_date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_late_date" class="form-label">Late Date</label>
+                        <input type="date" name="late_date" id="edit_late_date" class="form-control">
+                        <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -734,6 +766,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const description = button.getAttribute('data-bill-description');
             const amount = button.getAttribute('data-bill-amount');
             const dueDate = button.getAttribute('data-bill-due-date');
+            const dateIncurred = button.getAttribute('data-bill-date-incurred');
+            const lateDate = button.getAttribute('data-bill-late-date');
             const isPaid = button.getAttribute('data-bill-is-paid') === 'true';
             
             // Populate the form fields
@@ -741,6 +775,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('edit_description').value = description;
             document.getElementById('edit_amount').value = amount;
             document.getElementById('edit_due_date').value = dueDate;
+            document.getElementById('edit_date_incurred').value = dateIncurred;
+            document.getElementById('edit_late_date').value = lateDate;
             document.getElementById('edit_is_paid').checked = isPaid;
         });
     }

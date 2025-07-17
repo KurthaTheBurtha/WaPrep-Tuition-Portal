@@ -193,17 +193,7 @@
                                     </td>
                                    
                                     <td class="text-end pe-4">
-                                        <button type="button" class="btn btn-primary btn-student-profile btn-sm me-2"
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#editStudentModal"
-                                                data-student-id="{{ student.id }}"
-                                                data-student-first-name="{{ student.first_name }}"
-                                                data-student-last-name="{{ student.last_name }}"
-                                                data-student-grade="{{ student.grade }}"
-                                                data-student-dob="{{ student.date_of_birth|date:'Y-m-d' }}"
-                                                data-student-status="{{ student.status }}">
-                                            <i class="fas fa-edit me-1"></i> Student Profile
-                                        </button>
+                                        <!-- Student Profile button removed -->
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -568,16 +558,7 @@
         padding: 0.4em 0.6em;
     }
 
-    .btn-student-profile {
-        background-color: #2563eb !important; /* Strong blue */
-        border-color: #2563eb !important;
-        color: #fff !important;
-    }
-    .btn-student-profile:hover, .btn-student-profile:focus {
-        background-color: #1742a7 !important;
-        border-color: #1742a7 !important;
-        color: #fff !important;
-    }
+
 </style>
 
 <script>

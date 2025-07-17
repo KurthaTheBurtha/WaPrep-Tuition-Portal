@@ -388,6 +388,15 @@ class PaymentBreakdown(models.Model):
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     due_date = models.DateField(null=True, blank=True)
+    date_incurred = models.DateField(
+        default=timezone.now,
+        help_text="The date when this bill was incurred (defaults to creation date)"
+    )
+    late_date = models.DateField(
+        null=True, 
+        blank=True,
+        help_text="The date when this bill becomes late (defaults to last day of current month)"
+    )
     is_paid = models.BooleanField(default=False)
     show_in_payment_history = models.BooleanField(
         default=False, 
@@ -399,8 +408,35 @@ class PaymentBreakdown(models.Model):
     def __str__(self):
         return f"{self.description} - ${self.amount}"
 
+    @property
+    def is_overdue(self):
+        """Check if the bill is overdue based on late_date"""
+        if not self.late_date or self.is_paid:
+            return False
+        from django.utils import timezone
+        return self.late_date < timezone.now().date()
+
+    @property
+    def days_overdue(self):
+        """Calculate how many days overdue the bill is"""
+        if not self.is_overdue:
+            return 0
+        from django.utils import timezone
+        return (timezone.now().date() - self.late_date).days
+
+    def save(self, *args, **kwargs):
+        # Set default late_date if not provided
+        if not self.late_date:
+            from datetime import datetime
+            import calendar
+            # Prefer due_date, then date_incurred, then today
+            ref_date = self.due_date or self.date_incurred or datetime.now().date()
+            last_day_of_month = calendar.monthrange(ref_date.year, ref_date.month)[1]
+            self.late_date = datetime(ref_date.year, ref_date.month, last_day_of_month).date()
+        super().save(*args, **kwargs)
+
     class Meta:
-        ordering = ['due_date', 'created_at']
+        ordering = ['-is_paid', 'due_date', 'created_at']
 
 class PaymentItem(models.Model):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='payment_items')

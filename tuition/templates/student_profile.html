@@ -85,16 +85,30 @@
                     <div class="d-flex align-items-center justify-content-between mb-3 p-3 border rounded">
                         <div class="d-flex align-items-center">
                             <div>
-                                <strong>{{ sp.payer.first_name }} {{ sp.payer.last_name }}
+                                <div class="d-flex align-items-center mb-1">
+                                    <strong id="payer-name-{{ sp.id }}">{{ sp.payer.first_name }} {{ sp.payer.last_name }}</strong>
+                                    <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editPayerName('{{ sp.id }}', '{{ sp.payer.first_name }}', '{{ sp.payer.last_name }}')" title="Edit payer name">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
                                     {% if sp.payer.is_active %}
                                         <span class="badge bg-success ms-2 align-middle">Active</span>
                                     {% else %}
                                         <span class="badge bg-warning text-dark ms-2 align-middle">Pending Activation</span>
                                     {% endif %}
-                                </strong><br>
+                                </div>
                                 <small class="text-muted">ID: {{ sp.payer.user_id }}</small><br>
-                                <small class="text-muted">{{ sp.get_relationship_display }}{% if sp.is_primary %} (Primary){% endif %}</small><br>
-                                <small class="text-muted">{{ sp.payer.email }}</small>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted" id="payer-relationship-{{ sp.id }}">{{ sp.get_relationship_display }}</small>
+                                    <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editPayerRelationship('{{ sp.id }}', '{{ sp.relationship }}')" title="Edit relationship">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted" id="payer-email-{{ sp.id }}">{{ sp.payer.email }}</small>
+                                    <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editPayerEmail('{{ sp.id }}', '{{ sp.payer.email }}')" title="Edit email">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="text-end">
@@ -479,6 +493,282 @@ function cancelEditName(displayElement, firstName, lastName, skipRestore = false
     displayElement.style.display = '';
     if (!skipRestore) {
         displayElement.textContent = `${firstName} ${lastName}`;
+    }
+}
+
+// Payer inline editing functions
+function editPayerName(studentPayerId, firstName, lastName) {
+    const displayElement = document.getElementById(`payer-name-${studentPayerId}`);
+    const parent = displayElement.parentNode;
+    
+    // Create input fields
+    const firstInput = document.createElement('input');
+    firstInput.type = 'text';
+    firstInput.className = 'form-control form-control-sm d-inline-block';
+    firstInput.style.width = '100px';
+    firstInput.value = firstName;
+    firstInput.placeholder = 'First name';
+    firstInput.id = `edit-payer-first-${studentPayerId}`;
+    
+    const lastInput = document.createElement('input');
+    lastInput.type = 'text';
+    lastInput.className = 'form-control form-control-sm d-inline-block ms-2';
+    lastInput.style.width = '100px';
+    lastInput.value = lastName;
+    lastInput.placeholder = 'Last name';
+    lastInput.id = `edit-payer-last-${studentPayerId}`;
+    
+    // Save and cancel buttons
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm btn-success ms-2';
+    saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+    saveBtn.onclick = function() {
+        savePayerName(studentPayerId, firstInput.value, lastInput.value, displayElement);
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+    cancelBtn.onclick = function() {
+        cancelEditPayerName(displayElement, firstName, lastName);
+    };
+    
+    // Insert inputs and buttons
+    parent.insertBefore(firstInput, displayElement);
+    parent.insertBefore(lastInput, displayElement);
+    parent.insertBefore(saveBtn, displayElement.nextSibling);
+    parent.insertBefore(cancelBtn, saveBtn.nextSibling);
+    displayElement.style.display = 'none';
+    firstInput.focus();
+}
+
+function savePayerName(studentPayerId, newFirst, newLast, displayElement) {
+    fetch('{% url "inline_edit_payer_field" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `student_payer_id=${studentPayerId}&field_name=first_name&field_value=${encodeURIComponent(newFirst)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Now update last name
+            fetch('{% url "inline_edit_payer_field" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: `student_payer_id=${studentPayerId}&field_name=last_name&field_value=${encodeURIComponent(newLast)}`
+            })
+            .then(response2 => response2.json())
+            .then(data2 => {
+                if (data2.success) {
+                    displayElement.textContent = `${newFirst} ${newLast}`;
+                    showMessage('success', 'Payer name updated successfully');
+                } else {
+                    showMessage('error', data2.error || 'Error updating last name');
+                }
+            });
+        } else {
+            showMessage('error', data.error || 'Error updating first name');
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Error updating payer name');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        cancelEditPayerName(displayElement, newFirst, newLast, true);
+    });
+}
+
+function cancelEditPayerName(displayElement, firstName, lastName, skipRestore = false) {
+    const parent = displayElement.parentNode;
+    const firstInput = parent.querySelector('input[id^="edit-payer-first-"]');
+    const lastInput = parent.querySelector('input[id^="edit-payer-last-"]');
+    const saveBtn = parent.querySelector('.btn-success');
+    const cancelBtn = parent.querySelector('.btn-secondary');
+    if (firstInput) firstInput.remove();
+    if (lastInput) lastInput.remove();
+    if (saveBtn) saveBtn.remove();
+    if (cancelBtn) cancelBtn.remove();
+    displayElement.style.display = '';
+    if (!skipRestore) {
+        displayElement.textContent = `${firstName} ${lastName}`;
+    }
+}
+
+function editPayerRelationship(studentPayerId, relationship) {
+    const displayElement = document.getElementById(`payer-relationship-${studentPayerId}`);
+    const parent = displayElement.parentNode;
+    
+    // Create relationship select
+    const relationshipSelect = document.createElement('select');
+    relationshipSelect.className = 'form-select form-select-sm d-inline-block';
+    relationshipSelect.style.width = '120px';
+    relationshipSelect.id = `edit-payer-relationship-${studentPayerId}`;
+    
+    const relationships = [
+        {value: 'mother', text: 'Mother'},
+        {value: 'father', text: 'Father'},
+        {value: 'guardian', text: 'Guardian'},
+        {value: 'other', text: 'Other'}
+    ];
+    
+    relationships.forEach(rel => {
+        const option = document.createElement('option');
+        option.value = rel.value;
+        option.textContent = rel.text;
+        if (rel.value === relationship) option.selected = true;
+        relationshipSelect.appendChild(option);
+    });
+    
+    // Save and cancel buttons
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm btn-success ms-2';
+    saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+    saveBtn.onclick = function() {
+        savePayerRelationship(studentPayerId, relationshipSelect.value, displayElement);
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+    cancelBtn.onclick = function() {
+        cancelEditPayerRelationship(displayElement, relationship);
+    };
+    
+    // Insert elements
+    parent.insertBefore(relationshipSelect, displayElement);
+    parent.insertBefore(saveBtn, displayElement.nextSibling);
+    parent.insertBefore(cancelBtn, saveBtn.nextSibling);
+    displayElement.style.display = 'none';
+    relationshipSelect.focus();
+}
+
+function savePayerRelationship(studentPayerId, relationship, displayElement) {
+    fetch('{% url "inline_edit_payer_field" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `student_payer_id=${studentPayerId}&field_name=relationship&field_value=${encodeURIComponent(relationship)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayElement.innerHTML = data.display_value;
+            showMessage('success', 'Relationship updated successfully');
+        } else {
+            showMessage('error', data.error || 'Error updating relationship');
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Error updating relationship');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        cancelEditPayerRelationship(displayElement, relationship, true);
+    });
+}
+
+function cancelEditPayerRelationship(displayElement, relationship, skipRestore = false) {
+    const parent = displayElement.parentNode;
+    const select = parent.querySelector('select[id^="edit-payer-relationship-"]');
+    const saveBtn = parent.querySelector('.btn-success');
+    const cancelBtn = parent.querySelector('.btn-secondary');
+    
+    if (select) select.remove();
+    if (saveBtn) saveBtn.remove();
+    if (cancelBtn) cancelBtn.remove();
+    
+    displayElement.style.display = '';
+    if (!skipRestore) {
+        const relationshipText = select ? select.options[select.selectedIndex].text : relationship;
+        displayElement.innerHTML = relationshipText;
+    }
+}
+
+function editPayerEmail(studentPayerId, email) {
+    const displayElement = document.getElementById(`payer-email-${studentPayerId}`);
+    const parent = displayElement.parentNode;
+    
+    // Create input field
+    const input = document.createElement('input');
+    input.type = 'email';
+    input.className = 'form-control form-control-sm d-inline-block';
+    input.style.width = '200px';
+    input.value = email;
+    input.placeholder = 'Email address';
+    input.id = `edit-payer-email-${studentPayerId}`;
+    
+    // Save and cancel buttons
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm btn-success ms-2';
+    saveBtn.innerHTML = '<i class="fas fa-check"></i>';
+    saveBtn.onclick = function() {
+        savePayerEmail(studentPayerId, input.value, displayElement);
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+    cancelBtn.onclick = function() {
+        cancelEditPayerEmail(displayElement, email);
+    };
+    
+    // Insert elements
+    parent.insertBefore(input, displayElement);
+    parent.insertBefore(saveBtn, displayElement.nextSibling);
+    parent.insertBefore(cancelBtn, saveBtn.nextSibling);
+    displayElement.style.display = 'none';
+    input.focus();
+}
+
+function savePayerEmail(studentPayerId, email, displayElement) {
+    fetch('{% url "inline_edit_payer_field" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `student_payer_id=${studentPayerId}&field_name=email&field_value=${encodeURIComponent(email)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayElement.textContent = email;
+            showMessage('success', 'Email updated successfully');
+        } else {
+            showMessage('error', data.error || 'Error updating email');
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Error updating email');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        cancelEditPayerEmail(displayElement, email, true);
+    });
+}
+
+function cancelEditPayerEmail(displayElement, email, skipRestore = false) {
+    const parent = displayElement.parentNode;
+    const input = parent.querySelector('input[id^="edit-payer-email-"]');
+    const saveBtn = parent.querySelector('.btn-success');
+    const cancelBtn = parent.querySelector('.btn-secondary');
+    
+    if (input) input.remove();
+    if (saveBtn) saveBtn.remove();
+    if (cancelBtn) cancelBtn.remove();
+    
+    displayElement.style.display = '';
+    if (!skipRestore) {
+        displayElement.textContent = email;
     }
 }
 

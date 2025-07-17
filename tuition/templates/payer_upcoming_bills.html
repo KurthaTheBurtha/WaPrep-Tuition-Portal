@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">{{ student.first_name }} {{ student.last_name }} - Upcoming Bills</h4>
+                    <p class="text-muted mb-0">Billing Cycle: June 2025 - May 2026</p>
+                </div>
+                <div>
+                    <a href="{% url 'payer_dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-file-invoice text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Bills</h6>
+                            <h2 class="card-title mb-0">{{ total_bills }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Paid Amount</h6>
+                            <h2 class="card-title mb-0">${{ paid_amount|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-exclamation-triangle text-danger fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Unpaid Amount</h6>
+                            <h2 class="card-title mb-0">${{ unpaid_amount|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-dollar-sign text-info fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Amount</h6>
+                            <h2 class="card-title mb-0">${{ total_amount|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Months List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar me-2"></i>
+                        Monthly Billing Breakdown
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if monthly_billing %}
+                    <div class="accordion" id="monthsAccordion">
+                        {% for month_key, month_data in monthly_billing %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ month_key }}">
+                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ month_key }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ month_key }}">
+                                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fw-bold me-3">{{ month_data.month_display }}</span>
+                                            {% if month_data.total_bills > 0 %}
+                                                <span class="badge bg-primary me-2">{{ month_data.total_bills }} item{{ month_data.total_bills|pluralize }}</span>
+                                                <span class="text-muted">${{ month_data.total_amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-muted">No bills</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            {% if month_data.unpaid_amount > 0 %}
+                                                <span class="badge bg-danger me-2">${{ month_data.unpaid_amount|floatformat:2 }} unpaid</span>
+                                            {% endif %}
+                                            {% if month_data.paid_amount > 0 %}
+                                                <span class="badge bg-success me-2">${{ month_data.paid_amount|floatformat:2 }} paid</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ month_key }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ month_key }}" data-bs-parent="#monthsAccordion">
+                                <div class="accordion-body">
+                                    {% if month_data.bills %}
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th>Description</th>
+                                                        <th>Due Date</th>
+                                                        <th class="text-end">Amount</th>
+                                                        <th class="text-center">Status</th>
+                                                        <th class="text-end">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for bill in month_data.bills %}
+                                                    <tr>
+                                                        <td>{{ bill.description }}</td>
+                                                        <td>{{ bill.due_date|date:"M d, Y" }}</td>
+                                                        <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
+                                                        <td class="text-center">
+                                                            {% if bill.is_paid %}
+                                                                <span class="badge bg-success">Paid</span>
+                                                            {% elif bill.is_overdue %}
+                                                                <span class="badge bg-danger">Overdue</span>
+                                                            {% else %}
+                                                                <span class="badge bg-warning">Unpaid</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {% if not bill.is_paid %}
+                                                                <a href="{% url 'payment' student.id %}?bill_id={{ bill.id }}" class="btn btn-sm btn-primary">
+                                                                    <i class="fas fa-credit-card me-1"></i> Pay
+                                                                </a>
+                                                            {% else %}
+                                                                <span class="text-muted">Already paid</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="mt-3 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>Month Total: ${{ month_data.total_amount|floatformat:2 }}</strong>
+                                                {% if month_data.unpaid_amount > 0 %}
+                                                    <span class="text-danger ms-3">Unpaid: ${{ month_data.unpaid_amount|floatformat:2 }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if month_data.unpaid_amount > 0 %}
+                                                <a href="{% url 'payment' student.id %}?month={{ month_key }}" class="btn btn-primary">
+                                                    <i class="fas fa-credit-card me-1"></i> Pay All Unpaid for {{ month_data.month_display }}
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <div class="text-muted">
+                                                <i class="fas fa-calendar-times fa-2x mb-3"></i>
+                                                <p class="mb-0">No bills for {{ month_data.month_display }}</p>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="text-muted">
+                            <div class="mb-3">
+                                <i class="fas fa-calendar-times fa-3x"></i>
+                            </div>
+                            <h5>No Billing Information Found</h5>
+                            <p class="mb-0">No bills have been created for {{ student.first_name }} {{ student.last_name }} yet.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

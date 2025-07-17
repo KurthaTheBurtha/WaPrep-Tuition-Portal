@@ -107,8 +107,8 @@ class PasswordHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentBreakdown)
 class PaymentBreakdownAdmin(admin.ModelAdmin):
-    list_display = ('student', 'description', 'amount', 'due_date', 'is_paid', 'show_in_payment_history', 'created_at')
-    list_filter = ('is_paid', 'show_in_payment_history', 'due_date', 'created_at')
+    list_display = ('student', 'description', 'amount', 'due_date', 'date_incurred', 'late_date', 'is_paid', 'show_in_payment_history', 'created_at')
+    list_filter = ('is_paid', 'show_in_payment_history', 'due_date', 'created_at', 'late_date', 'date_incurred')
     search_fields = ('student__first_name', 'student__last_name', 'description')
     list_editable = ('is_paid', 'show_in_payment_history')
     readonly_fields = ('created_at', 'updated_at')
@@ -116,7 +116,7 @@ class PaymentBreakdownAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Bill Information', {
-            'fields': ('student', 'description', 'amount', 'due_date')
+            'fields': ('student', 'description', 'amount', 'due_date', 'date_incurred', 'late_date')
         }),
         ('Status', {
             'fields': ('is_paid', 'show_in_payment_history')
