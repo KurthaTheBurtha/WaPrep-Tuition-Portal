@@ -16,10 +16,11 @@
                                 <tr>
                                     <th>Student</th>
                                     <th>Past Due</th>
-                                    <th>Due By Due Date</th>
+                                    <th></th>
+                                    <th>Due By End of Month</th>
                                     <th>Due Date</th>
-                                    <th style="text-align: center;">View Upcoming Bills</th>
                                     <th class="text-end">Actions</th>
+                                    <th style="text-align: center;">View Future Bills</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -46,6 +47,13 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        {% if student.overdue_amount > 0 %}
+                                        <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger me-1">
+                                                <i class="fas fa-exclamation-triangle me-1"></i> Pay Past Due
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                    <td>
                                         {% if student.upcoming_amount > 0 %}
                                             <div class="d-flex flex-column">
                                                 <span class="fw-bold">${{ student.upcoming_amount|floatformat:2 }}</span>
@@ -64,19 +72,14 @@
                                             <span class="text-muted">No due date</span>
                                         {% endif %}
                                     </td>
+                                    <td class="text-end">
+                                        <a href="{% url 'payment' student.id %}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-credit-card me-1"></i> Pay
+                                        </a>
+                                    </td>
                                     <td style="text-align: center;">
                                         <a href="{% url 'payer_upcoming_bills' student.id %}" class="btn btn-sm" style="background-color: #007bff; border-color: #007bff; color: white; text-decoration: none;">
                                             View
-                                        </a>
-                                    </td>
-                                    <td class="text-end">
-                                        {% if student.overdue_amount > 0 %}
-                                            <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger me-1">
-                                                <i class="fas fa-exclamation-triangle me-1"></i> Pay Overdue
-                                            </a>
-                                        {% endif %}
-                                        <a href="{% url 'payment' student.id %}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-credit-card me-1"></i> Pay Upcoming
                                         </a>
                                     </td>
                                 </tr>

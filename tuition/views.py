@@ -103,10 +103,11 @@ def payment(request, student_id):
         messages.error(request, 'You are not authorized to make payments for this student.')
         return redirect('payer_dashboard')
     
-    # Check for specific bill_id, month, or overdue parameters
+    # Check for specific bill_id, month, overdue, or all_bills parameters
     bill_id = request.GET.get('bill_id')
     month_param = request.GET.get('month')
     overdue_param = request.GET.get('overdue')
+    all_bills_param = request.GET.get('all_bills')
     
     if bill_id:
         # Show specific bill
@@ -125,7 +126,7 @@ def payment(request, student_id):
             year = int(year)
             month = int(month)
             
-            from datetime import date
+            from datetime import date, timedelta
             first_day = date(year, month, 1)
             if month == 12:
                 last_day = date(year + 1, 1, 1) - timedelta(days=1)
@@ -148,13 +149,30 @@ def payment(request, student_id):
             is_paid=False,
             late_date__lt=today
         ).order_by('due_date')
+    elif all_bills_param:
+        # Show all unpaid bills
+        breakdown_items = PaymentBreakdown.objects.filter(
+            student=student,
+            is_paid=False
+        ).order_by('due_date')
     else:
-        # Default: show all upcoming bills (not overdue)
-        today = timezone.now().date()
+        # Default: show bills due by end of current month
+        from datetime import datetime, timedelta
+        import calendar
+        
+        current_date = datetime.now()
+        current_month = current_date.month
+        current_year = current_date.year
+        today = current_date.date()
+        
+        # Calculate the last day of the current month
+        last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+        end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+        
         breakdown_items = PaymentBreakdown.objects.filter(
             student=student,
             is_paid=False,
-            late_date__gte=today
+            due_date__lte=end_of_month
         ).order_by('due_date')
     
     total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
@@ -188,15 +206,17 @@ def payment(request, student_id):
             year, month = month_param.split('-')
             year = int(year)
             month = int(month)
-            from datetime import date
+            from datetime import date, timedelta
             first_day = date(year, month, 1)
             payment_description = f"Payment for {first_day.strftime('%B %Y')}"
         except (ValueError, IndexError):
             payment_description = "Payment for selected items"
     elif overdue_param:
         payment_description = "Payment for overdue bills"
+    elif all_bills_param:
+        payment_description = "Payment for all unpaid bills"
     else:
-        payment_description = "Payment for upcoming bills"
+        payment_description = "Payment for bills due by end of month"
     
     context = {
         'student_name': f"{student.first_name} {student.last_name}",
@@ -209,6 +229,7 @@ def payment(request, student_id):
         'bill_id': bill_id,
         'month_param': month_param,
         'overdue_param': overdue_param,
+        'all_bills_param': all_bills_param,
     }
     return render(request, 'payment.html', context)
 
@@ -263,6 +284,7 @@ def process_payment(request):
                 bill_id = request.POST.get('bill_id')
                 month_param = request.POST.get('month')
                 overdue_param = request.POST.get('overdue')
+                all_bills_param = request.POST.get('all_bills')
                 
                 if bill_id:
                     # Specific bill payment
@@ -278,7 +300,7 @@ def process_payment(request):
                         year = int(year)
                         month = int(month)
                         
-                        from datetime import date
+                        from datetime import date, timedelta
                         first_day = date(year, month, 1)
                         if month == 12:
                             last_day = date(year + 1, 1, 1) - timedelta(days=1)
@@ -301,13 +323,30 @@ def process_payment(request):
                         is_paid=False,
                         late_date__lt=today
                     )
+                elif all_bills_param:
+                    # All unpaid bills payment
+                    payment_items = PaymentBreakdown.objects.filter(
+                        student=student,
+                        is_paid=False
+                    )
                 else:
-                    # Default: all upcoming bills (not overdue)
-                    today = timezone.now().date()
+                    # Default: bills due by end of current month
+                    from datetime import datetime, timedelta
+                    import calendar
+                    
+                    current_date = datetime.now()
+                    current_month = current_date.month
+                    current_year = current_date.year
+                    today = current_date.date()
+                    
+                    # Calculate the last day of the current month
+                    last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+                    end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+                    
                     payment_items = PaymentBreakdown.objects.filter(
                         student=student,
                         is_paid=False,
-                        late_date__gte=today
+                        due_date__lte=end_of_month
                     )
                 
                 # Create payment record only after confirming success
@@ -1423,9 +1462,11 @@ def payer_dashboard(request):
         student.overdue_amount = overdue_items.aggregate(total=Sum('amount'))['total'] or 0
         student.overdue_count = overdue_items.count()
         
-        # Get upcoming items (not overdue, due by due date)
-        # Include all unpaid bills that are not overdue (due by their due date)
-        upcoming_items = breakdown_items.filter(late_date__gte=today)
+        # Get upcoming items (due by the end of the current month)
+        # Show bills that are due by the end of the current month
+        upcoming_items = breakdown_items.filter(
+            due_date__lte=end_of_month
+        ).order_by('due_date')
         student.upcoming_items = upcoming_items
         student.upcoming_amount = upcoming_items.aggregate(total=Sum('amount'))['total'] or 0
         student.upcoming_count = upcoming_items.count()
@@ -1863,6 +1904,8 @@ def student_months(request, student_id):
             description = request.POST.get('description')
             amount = request.POST.get('amount')
             due_date = request.POST.get('due_date')
+            date_incurred = request.POST.get('date_incurred')
+            late_date = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
             try:
                 PaymentBreakdown.objects.create(
@@ -1870,6 +1913,8 @@ def student_months(request, student_id):
                     description=description,
                     amount=amount,
                     due_date=due_date,
+                    date_incurred=date_incurred if date_incurred else None,
+                    late_date=late_date if late_date else None,
                     is_paid=is_paid,
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
@@ -1880,7 +1925,7 @@ def student_months(request, student_id):
         return redirect('student_months', student_id=student_id)
     
     # Get all bills for this student with due dates
-    all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('-due_date')
+    all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('due_date')
     
     # Define the billing cycle: June 2025 to May 2026
     billing_cycle_months = []
@@ -2258,52 +2303,116 @@ def student_bills(request, student_id):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('home')
     student = get_object_or_404(Student, id=student_id)
-    bills = student.payment_breakdowns.all().order_by('-due_date')
+    # Get all bills and sort them logically: overdue first, then by due date
+    all_bills = student.payment_breakdowns.all()
+    
+    # Convert to list and sort by priority: overdue > unpaid > paid, then by due date
+    bills_list = list(all_bills)
+    from django.utils import timezone
+    today = timezone.now().date()
+    
+    def sort_key(bill):
+        # Overdue bills go first (priority 0)
+        if bill.late_date and bill.late_date < today and not bill.is_paid:
+            days_overdue = (today - bill.late_date).days
+            return (0, -days_overdue, bill.due_date or today)  # Negative for reverse sort
+        
+        # Current unpaid bills go second (priority 1)
+        if not bill.is_paid:
+            return (1, 0, bill.due_date or today)
+        
+        # Paid bills go last (priority 2)
+        return (2, 0, bill.due_date or today)
+    
+    bills_list.sort(key=sort_key)
+    bills = bills_list
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add':
             description = request.POST.get('description')
             amount = request.POST.get('amount')
-            due_date = request.POST.get('due_date')
-            date_incurred = request.POST.get('date_incurred')
-            late_date = request.POST.get('late_date')
+            due_date_str = request.POST.get('due_date')
+            date_incurred_str = request.POST.get('date_incurred')
+            late_date_str = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
+            
             try:
+                # Convert string dates to date objects
+                from datetime import datetime
+                
+                due_date = None
+                if due_date_str:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                
+                date_incurred = None
+                if date_incurred_str:
+                    date_incurred = datetime.strptime(date_incurred_str, '%Y-%m-%d').date()
+                else:
+                    # Use today's date if not provided
+                    date_incurred = datetime.now().date()
+                
+                late_date = None
+                if late_date_str:
+                    late_date = datetime.strptime(late_date_str, '%Y-%m-%d').date()
+                
                 PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
                     amount=amount,
                     due_date=due_date,
-                    date_incurred=date_incurred if date_incurred else None,
-                    late_date=late_date if late_date else None,
+                    date_incurred=date_incurred,
+                    late_date=late_date,
                     is_paid=is_paid,
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
                 messages.success(request, 'Bill added successfully.')
+            except ValueError as e:
+                messages.error(request, f'Invalid date format: {str(e)}')
             except Exception as e:
                 messages.error(request, f'Error adding bill: {str(e)}')
         elif action == 'edit':
             bill_id = request.POST.get('bill_id')
             description = request.POST.get('description')
             amount = request.POST.get('amount')
-            due_date = request.POST.get('due_date')
-            date_incurred = request.POST.get('date_incurred')
-            late_date = request.POST.get('late_date')
+            due_date_str = request.POST.get('due_date')
+            date_incurred_str = request.POST.get('date_incurred')
+            late_date_str = request.POST.get('late_date')
             is_paid = request.POST.get('is_paid') == 'on'
             show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
+            
             try:
+                # Convert string dates to date objects
+                from datetime import datetime
+                
+                due_date = None
+                if due_date_str:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                
+                date_incurred = None
+                if date_incurred_str:
+                    date_incurred = datetime.strptime(date_incurred_str, '%Y-%m-%d').date()
+                else:
+                    # Use today's date if not provided
+                    date_incurred = datetime.now().date()
+                
+                late_date = None
+                if late_date_str:
+                    late_date = datetime.strptime(late_date_str, '%Y-%m-%d').date()
+                
                 bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
-                bill.date_incurred = date_incurred if date_incurred else None
-                bill.late_date = late_date if late_date else None
+                bill.date_incurred = date_incurred
+                bill.late_date = late_date
                 bill.is_paid = is_paid
                 bill.show_in_payment_history = show_in_payment_history
                 bill.save()
                 messages.success(request, 'Bill updated successfully.')
             except PaymentBreakdown.DoesNotExist:
                 messages.error(request, 'Bill not found.')
+            except ValueError as e:
+                messages.error(request, f'Invalid date format: {str(e)}')
             except Exception as e:
                 messages.error(request, f'Error updating bill: {str(e)}')
         elif action == 'remove':

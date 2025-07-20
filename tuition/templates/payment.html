@@ -173,6 +173,9 @@
                 {% if overdue_param %}
                 <input type="hidden" name="overdue" value="{{ overdue_param }}">
                 {% endif %}
+                {% if all_bills_param %}
+                <input type="hidden" name="all_bills" value="{{ all_bills_param }}">
+                {% endif %}
                 
                 <div class="mb-3">
                     <div id="payment-element" class="form-control"></div>

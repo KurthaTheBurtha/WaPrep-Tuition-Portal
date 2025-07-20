@@ -317,6 +317,16 @@
                         <input type="date" name="due_date" id="due_date" class="form-control" required>
                     </div>
                     <div class="mb-3">
+                        <label for="date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="late_date" class="form-label">Late Date</label>
+                        <input type="date" name="late_date" id="late_date" class="form-control">
+                        <div class="form-text">Leave blank to use last day of the month</div>
+                    </div>
+                    <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid">
                             <label class="form-check-label" for="is_paid">

@@ -389,7 +389,6 @@ class PaymentBreakdown(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     due_date = models.DateField(null=True, blank=True)
     date_incurred = models.DateField(
-        default=timezone.now,
         help_text="The date when this bill was incurred (defaults to creation date)"
     )
     late_date = models.DateField(
@@ -414,7 +413,16 @@ class PaymentBreakdown(models.Model):
         if not self.late_date or self.is_paid:
             return False
         from django.utils import timezone
-        return self.late_date < timezone.now().date()
+        # Ensure late_date is a date object
+        if isinstance(self.late_date, str):
+            try:
+                from datetime import datetime
+                late_date = datetime.strptime(self.late_date, '%Y-%m-%d').date()
+            except ValueError:
+                return False
+        else:
+            late_date = self.late_date
+        return late_date < timezone.now().date()
 
     @property
     def days_overdue(self):
@@ -422,15 +430,37 @@ class PaymentBreakdown(models.Model):
         if not self.is_overdue:
             return 0
         from django.utils import timezone
-        return (timezone.now().date() - self.late_date).days
+        # Ensure late_date is a date object
+        if isinstance(self.late_date, str):
+            try:
+                from datetime import datetime
+                late_date = datetime.strptime(self.late_date, '%Y-%m-%d').date()
+            except ValueError:
+                return 0
+        else:
+            late_date = self.late_date
+        return (timezone.now().date() - late_date).days
 
     def save(self, *args, **kwargs):
+        # Ensure date_incurred is always set
+        if not self.date_incurred:
+            from datetime import datetime
+            self.date_incurred = datetime.now().date()
+        
         # Set default late_date if not provided
         if not self.late_date:
             from datetime import datetime
             import calendar
             # Prefer due_date, then date_incurred, then today
             ref_date = self.due_date or self.date_incurred or datetime.now().date()
+            
+            # Ensure ref_date is a date object, not a string
+            if isinstance(ref_date, str):
+                try:
+                    ref_date = datetime.strptime(ref_date, '%Y-%m-%d').date()
+                except ValueError:
+                    ref_date = datetime.now().date()
+            
             last_day_of_month = calendar.monthrange(ref_date.year, ref_date.month)[1]
             self.late_date = datetime(ref_date.year, ref_date.month, last_day_of_month).date()
         super().save(*args, **kwargs)
