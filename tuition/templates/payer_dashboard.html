@@ -15,24 +15,28 @@
                             <thead>
                                 <tr>
                                     <th>Student</th>
+                                    <th>Pay</th>
                                     <th>Past Due</th>
-                                    <th></th>
                                     <th>Due By End of Month</th>
                                     <th>Due Date</th>
-                                    <th class="text-end">Actions</th>
-                                    <th style="text-align: center;">View Future Bills</th>
+                                    <th style="text-align: center;">View Available Bills</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for student in my_students %}
                                 <tr>
                                     <td>
-                                        <div class="d-flex align-items-center">
+                                        <div class="d-flex align-items-center justify-content-between">
                                             <div>
                                                 <h6 class="mb-0">{{ student.first_name }} {{ student.last_name }}</h6>
                                                 <small class="text-muted">DOB: {{ student.date_of_birth|date:"M d, Y" }}</small>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'payment' student.id %}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-credit-card me-1"></i> Pay
+                                        </a>
                                     </td>
                                     <td>
                                         {% if student.overdue_amount > 0 %}
@@ -42,15 +46,13 @@
                                                     {{ student.overdue_count }} item{{ student.overdue_count|pluralize }}
                                                 </small>
                                             </div>
+                                            <div class="mt-2">
+                                                <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i> Pay Past Due
+                                                </a>
+                                            </div>
                                         {% else %}
                                             <span class="text-muted">No overdue items</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if student.overdue_amount > 0 %}
-                                        <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger me-1">
-                                                <i class="fas fa-exclamation-triangle me-1"></i> Pay Past Due
-                                            </a>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -72,20 +74,16 @@
                                             <span class="text-muted">No due date</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">
-                                        <a href="{% url 'payment' student.id %}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-credit-card me-1"></i> Pay
-                                        </a>
-                                    </td>
+
                                     <td style="text-align: center;">
                                         <a href="{% url 'payer_upcoming_bills' student.id %}" class="btn btn-sm" style="background-color: #007bff; border-color: #007bff; color: white; text-decoration: none;">
-                                            View
+                                            View Bills
                                         </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center py-5">
+                                    <td colspan="5" class="text-center py-5">
                                         <div class="text-muted">
                                             <div class="mb-3">
                                                 <i class="fas fa-user-graduate fa-3x"></i>

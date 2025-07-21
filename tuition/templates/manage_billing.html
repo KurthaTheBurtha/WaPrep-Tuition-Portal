@@ -218,16 +218,10 @@
         <div class="mt-2">Processing...</div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-console.log('Script block loaded!');
-let isLoading = false;
-
-// Initialize tooltips
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded - JavaScript is working');
+    console.log('Manage billing script loaded');
     
     // Initialize Bootstrap tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -235,25 +229,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
     
-
-    
-
-    
-
-    
     // Handle clickable rows
-    console.log('Setting up clickable rows...');
     const clickableRows = document.querySelectorAll('.clickable-row');
     console.log('Found', clickableRows.length, 'clickable rows');
     
-    clickableRows.forEach((row, index) => {
-        console.log('Setting up row', index, 'with data-href:', row.getAttribute('data-href'));
+    clickableRows.forEach(function(row, index) {
+        console.log('Setting up row', index, 'with href:', row.getAttribute('data-href'));
+        
         row.addEventListener('click', function(e) {
             console.log('Row clicked!');
-            console.log('Event target:', e.target);
-            console.log('Target tagName:', e.target.tagName);
-            console.log('Closest a:', e.target.closest('a'));
-            console.log('Closest button:', e.target.closest('button'));
             
             // Don't navigate if clicking on a button, link, or checkbox
             if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || 
@@ -263,15 +247,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            console.log('Navigating to:', this.getAttribute('data-href'));
-            window.location.href = this.getAttribute('data-href');
+            const href = this.getAttribute('data-href');
+            console.log('Navigating to:', href);
+            if (href) {
+                window.location.href = href;
+            }
+        });
+        
+        // Add hover effect
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
         });
     });
 });
 
-
-
-
+let isLoading = false;
 
 function setLoadingState(loading) {
     isLoading = loading;
@@ -283,8 +277,6 @@ function setLoadingState(loading) {
         overlay.style.display = 'none';
     }
 }
-
-
 
 // Handle page unload to prevent multiple submissions
 window.addEventListener('beforeunload', function(e) {
