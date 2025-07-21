@@ -156,26 +156,44 @@ def payment(request, student_id):
             is_paid=False
         ).order_by('due_date')
     else:
-        # Default: show bills due by end of current month
-        from datetime import datetime, timedelta
-        import calendar
-        
-        current_date = datetime.now()
-        current_month = current_date.month
-        current_year = current_date.year
-        today = current_date.date()
-        
-        # Calculate the last day of the current month
-        last_day_of_month = calendar.monthrange(current_year, current_month)[1]
-        end_of_month = datetime(current_year, current_month, last_day_of_month).date()
-        
+        # Default: show all unpaid bills (so we can categorize them properly)
         breakdown_items = PaymentBreakdown.objects.filter(
             student=student,
-            is_paid=False,
-            due_date__lte=end_of_month
+            is_paid=False
         ).order_by('due_date')
     
-    total_amount_due = breakdown_items.aggregate(total=Sum('amount'))['total'] or 0
+    # Categorize breakdown items
+    from datetime import datetime, timedelta
+    import calendar
+    
+    today = timezone.now().date()
+    current_date = datetime.now()
+    current_month = current_date.month
+    current_year = current_date.year
+    
+    # Calculate the last day of the current month
+    last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+    end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+    
+    # Categorize items
+    overdue_items = []
+    current_month_items = []
+    future_items = []
+    
+    for item in breakdown_items:
+        if item.late_date and item.late_date < today:
+            overdue_items.append(item)
+        elif item.due_date <= end_of_month:
+            current_month_items.append(item)
+        else:
+            future_items.append(item)
+    
+    # Calculate totals for each category
+    overdue_total = sum(item.amount for item in overdue_items)
+    current_month_total = sum(item.amount for item in current_month_items)
+    future_total = sum(item.amount for item in future_items)
+    
+    total_amount_due = overdue_total + current_month_total + future_total
     
     # Stripe integration
     stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
@@ -218,10 +236,45 @@ def payment(request, student_id):
     else:
         payment_description = "Payment for bills due by end of month"
     
+    # Prepare bill data for JavaScript
+    import json
+    overdue_items_json = json.dumps([{
+        'id': item.id,
+        'description': item.description,
+        'amount': float(item.amount),
+        'due_date': item.due_date.isoformat(),
+        'late_date': item.late_date.isoformat() if item.late_date else None
+    } for item in overdue_items])
+    
+    current_month_items_json = json.dumps([{
+        'id': item.id,
+        'description': item.description,
+        'amount': float(item.amount),
+        'due_date': item.due_date.isoformat(),
+        'late_date': item.late_date.isoformat() if item.late_date else None
+    } for item in current_month_items])
+    
+    future_items_json = json.dumps([{
+        'id': item.id,
+        'description': item.description,
+        'amount': float(item.amount),
+        'due_date': item.due_date.isoformat(),
+        'late_date': item.late_date.isoformat() if item.late_date else None
+    } for item in future_items])
+    
     context = {
         'student_name': f"{student.first_name} {student.last_name}",
         'total_amount_due': total_amount_due,
         'breakdown_items': breakdown_items,
+        'overdue_items': overdue_items,
+        'current_month_items': current_month_items,
+        'future_items': future_items,
+        'overdue_items_json': overdue_items_json,
+        'current_month_items_json': current_month_items_json,
+        'future_items_json': future_items_json,
+        'overdue_total': overdue_total,
+        'current_month_total': current_month_total,
+        'future_total': future_total,
         'student_id': student_id,
         'payment_description': payment_description,
         'STRIPE_PUBLISHABLE_KEY': stripe_publishable_key,
@@ -362,31 +415,115 @@ def process_payment(request):
                 
                 # Create PaymentItem records to link payment to breakdown items
                 total_payment_amount = Decimal(str(amount))
-                payment_items_list = list(payment_items)
                 
-                if payment_items_list:
-                    # Calculate how much each item should be paid
-                    # For now, we'll distribute the payment proportionally across all items
-                    total_items_amount = sum(item.amount for item in payment_items_list)
+                # Get all unpaid bills and categorize them by priority
+                from datetime import datetime, timedelta
+                import calendar
+                
+                today = timezone.now().date()
+                current_date = datetime.now()
+                current_month = current_date.month
+                current_year = current_date.year
+                
+                # Calculate the last day of the current month
+                last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+                end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+                
+                # Get all unpaid bills
+                all_unpaid_bills = PaymentBreakdown.objects.filter(
+                    student=student,
+                    is_paid=False
+                ).order_by('due_date')
+                
+                # Categorize bills by priority
+                overdue_bills = []
+                current_month_bills = []
+                future_bills = []
+                
+                for bill in all_unpaid_bills:
+                    if bill.late_date and bill.late_date < today:
+                        overdue_bills.append(bill)
+                    elif bill.due_date <= end_of_month:
+                        current_month_bills.append(bill)
+                    else:
+                        future_bills.append(bill)
+                
+                # Apply payment in priority order: overdue -> current month -> future
+                remaining_amount = total_payment_amount
+                bills_to_update = []
+                
+                # Process overdue bills first
+                for bill in overdue_bills:
+                    if remaining_amount <= 0:
+                        break
                     
-                    for item in payment_items_list:
-                        if total_items_amount > 0:
-                            # Calculate proportional amount for this item
-                            item_amount = (item.amount / total_items_amount) * total_payment_amount
-                            # Round to 2 decimal places
-                            item_amount = round(item_amount, 2)
-                        else:
-                            item_amount = Decimal('0.00')
-                        
-                        # Create PaymentItem record
-                        PaymentItem.objects.create(
-                            payment=payment,
-                            breakdown_item=item,
-                            amount_paid=item_amount
-                        )
+                    bill_amount = min(remaining_amount, bill.amount)
                     
-                    # Mark payment items as paid
-                    payment_items.update(is_paid=True)
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount
+                    )
+                    
+                    # Update bill amount
+                    bill.amount -= bill_amount
+                    if bill.amount <= 0:
+                        bill.is_paid = True
+                        bill.amount = Decimal('0.00')
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
+                
+                # Process current month bills
+                for bill in current_month_bills:
+                    if remaining_amount <= 0:
+                        break
+                    
+                    bill_amount = min(remaining_amount, bill.amount)
+                    
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount
+                    )
+                    
+                    # Update bill amount
+                    bill.amount -= bill_amount
+                    if bill.amount <= 0:
+                        bill.is_paid = True
+                        bill.amount = Decimal('0.00')
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
+                
+                # Process future bills
+                for bill in future_bills:
+                    if remaining_amount <= 0:
+                        break
+                    
+                    bill_amount = min(remaining_amount, bill.amount)
+                    
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount
+                    )
+                    
+                    # Update bill amount
+                    bill.amount -= bill_amount
+                    if bill.amount <= 0:
+                        bill.is_paid = True
+                        bill.amount = Decimal('0.00')
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
+                
+                # Save all updated bills
+                for bill in bills_to_update:
+                    bill.save()
                 
                 # Determine payment method type for success message
                 payment_method_name = "payment method"

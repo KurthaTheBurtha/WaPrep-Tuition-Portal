@@ -70,40 +70,259 @@
 
             <div class="payment-breakdown mb-4">
                 <h5>Payment Breakdown</h5>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Due Date</th>
-                                <th class="text-end">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in breakdown_items %}
-                            <tr>
-                                <td>{{ item.description }}</td>
-                                <td>{{ item.due_date|date:"M d, Y" }}</td>
-                                <td class="text-end">${{ item.amount|floatformat:2 }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="3" class="text-center py-4">
-                                    <div class="text-muted">
-                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
-                                        <p class="mb-0">No payments due for this selection</p>
+                
+                <!-- Overdue Items Accordion -->
+                <div class="accordion mb-3" id="overdueAccordion">
+                    <div class="accordion-item border-danger">
+                        <h2 class="accordion-header" id="overdueHeading">
+                            <button class="accordion-button {% if not overdue_items %}collapsed{% endif %}" style="background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;" type="button" data-bs-toggle="collapse" data-bs-target="#overdueCollapse" aria-expanded="{% if overdue_items %}true{% else %}false{% endif %}" aria-controls="overdueCollapse">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Overdue Items
+                                {% if overdue_items %}
+                                    <span class="badge ms-2" style="background-color: #721c24; color: white;">{{ overdue_items|length }} item{{ overdue_items|length|pluralize }}</span>
+                                    <span class="ms-auto">${{ overdue_total|floatformat:2 }}</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="overdueCollapse" class="accordion-collapse collapse {% if overdue_items %}show{% endif %}" aria-labelledby="overdueHeading" data-bs-parent="#overdueAccordion">
+                            <div class="accordion-body">
+                                {% if overdue_items %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th>Due Date</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in overdue_items %}
+                                                <tr>
+                                                    <td>{{ item.description }}</td>
+                                                    <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td colspan="2" class="text-end"><strong>Overdue Total:</strong></td>
+                                                    <td class="text-end"><strong>${{ overdue_total|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
                                     </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="2" class="text-end"><strong>Total Due:</strong></td>
-                                <td class="text-end"><strong>${{ total_amount_due|floatformat:2 }}</strong></td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                                {% else %}
+                                    <div class="text-center py-3">
+                                        <div class="text-muted">
+                                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                            <p class="mb-0">No overdue items</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Month Items Accordion -->
+                <div class="accordion mb-3" id="currentMonthAccordion">
+                    <div class="accordion-item border-warning">
+                        <h2 class="accordion-header" id="currentMonthHeading">
+                            <button class="accordion-button {% if not current_month_items %}collapsed{% endif %}" style="background-color: #fff3cd; border-color: #ffeaa7; color: #856404;" type="button" data-bs-toggle="collapse" data-bs-target="#currentMonthCollapse" aria-expanded="{% if current_month_items %}true{% else %}false{% endif %}" aria-controls="currentMonthCollapse">
+                                <i class="fas fa-calendar-day me-2"></i>Due This Month
+                                {% if current_month_items %}
+                                    <span class="badge ms-2" style="background-color: #856404; color: white;">{{ current_month_items|length }} item{{ current_month_items|length|pluralize }}</span>
+                                    <span class="ms-auto">${{ current_month_total|floatformat:2 }}</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="currentMonthCollapse" class="accordion-collapse collapse {% if current_month_items %}show{% endif %}" aria-labelledby="currentMonthHeading" data-bs-parent="#currentMonthAccordion">
+                            <div class="accordion-body">
+                                {% if current_month_items %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th>Due Date</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in current_month_items %}
+                                                <tr>
+                                                    <td>{{ item.description }}</td>
+                                                    <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td colspan="2" class="text-end"><strong>Current Month Total:</strong></td>
+                                                    <td class="text-end"><strong>${{ current_month_total|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-3">
+                                        <div class="text-muted">
+                                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                            <p class="mb-0">No items due this month</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Future Items Accordion -->
+                <div class="accordion mb-3" id="futureAccordion">
+                    <div class="accordion-item border-info">
+                        <h2 class="accordion-header" id="futureHeading">
+                            <button class="accordion-button collapsed" style="background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;" type="button" data-bs-toggle="collapse" data-bs-target="#futureCollapse" aria-expanded="false" aria-controls="futureCollapse">
+                                <i class="fas fa-calendar-alt me-2"></i>Future Items
+                                {% if future_items %}
+                                    <span class="badge ms-2" style="background-color: #0c5460; color: white;">{{ future_items|length }} item{{ future_items|length|pluralize }}</span>
+                                    <span class="ms-auto">${{ future_total|floatformat:2 }}</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="futureCollapse" class="accordion-collapse collapse" aria-labelledby="futureHeading" data-bs-parent="#futureAccordion">
+                            <div class="accordion-body">
+                                {% if future_items %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th>Due Date</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in future_items %}
+                                                <tr>
+                                                    <td>{{ item.description }}</td>
+                                                    <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr>
+                                                    <td colspan="2" class="text-end"><strong>Future Total:</strong></td>
+                                                    <td class="text-end"><strong>${{ future_total|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-3">
+                                        <div class="text-muted">
+                                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                            <p class="mb-0">No future items</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Summary -->
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="mb-2">Payment Summary</h6>
+                                {% if overdue_total > 0 %}
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-danger">Overdue:</span>
+                                        <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
+                                    </div>
+                                {% endif %}
+                                {% if current_month_total > 0 %}
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-warning">Current Month:</span>
+                                        <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
+                                    </div>
+                                {% endif %}
+                                {% if future_total > 0 %}
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-info">Future:</span>
+                                        <span class="text-info">${{ future_total|floatformat:2 }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <h5 class="mb-0">Total Due: <strong>${{ total_amount_due|floatformat:2 }}</strong></h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Amount Selector -->
+            <div class="payment-amount-selector mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-dollar-sign me-2"></i>Payment Amount
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="payment_amount" class="form-label">How much would you like to pay?</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="payment_amount" 
+                                               name="payment_amount" 
+                                               step="0.01" 
+                                               min="0.01" 
+                                               max="{{ total_amount_due }}" 
+                                               value="{{ total_amount_due }}"
+                                               required>
+                                    </div>
+                                    <div class="form-text">
+                                        Enter the amount you want to pay. The system will automatically apply it to your bills in order of urgency.
+                                    </div>
+                                </div>
+                                
+                                <!-- Quick Amount Buttons -->
+                                <div class="mb-3">
+                                    <label class="form-label">Quick Amount Options:</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% if overdue_total > 0 %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="setPaymentAmount({{ overdue_total }})">
+                                                Pay Overdue Only (${{ overdue_total|floatformat:2 }})
+                                            </button>
+                                        {% endif %}
+                                        {% if current_month_total > 0 %}
+                                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="setPaymentAmount({{ current_month_total }})">
+                                                Pay Current Month (${{ current_month_total|floatformat:2 }})
+                                            </button>
+                                        {% endif %}
+                                        {% if overdue_total > 0 and current_month_total > 0 %}
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setPaymentAmount({{ overdue_total|add:current_month_total }})">
+                                                Pay Overdue + Current (${{ overdue_total|add:current_month_total|floatformat:2 }})
+                                            </button>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-outline-success btn-sm" onclick="setPaymentAmount({{ total_amount_due }})">
+                                            Pay All (${{ total_amount_due|floatformat:2 }})
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -162,7 +381,7 @@
             <form id="stripe-payment-form" method="post" action="{% url 'process_payment' %}">
                 {% csrf_token %}
                 <input type="hidden" name="student_id" value="{{ student_id }}">
-                <input type="hidden" name="amount" value="{{ total_amount_due }}">
+                <input type="hidden" name="amount" id="amount_input" value="{{ total_amount_due }}">
                 <input type="hidden" name="payment_intent_id" id="payment_intent_id">
                 {% if bill_id %}
                 <input type="hidden" name="bill_id" value="{{ bill_id }}">
@@ -489,6 +708,22 @@ document.getElementById('stripe-payment-form')?.addEventListener('submit', async
         submitButton.disabled = false;
         submitButton.innerHTML = originalText;
     }
+});
+
+// Payment Amount Selection Functionality
+const overdueItems = {{ overdue_items_json|safe }};
+const currentMonthItems = {{ current_month_items_json|safe }};
+const futureItems = {{ future_items_json|safe }};
+
+function setPaymentAmount(amount) {
+    document.getElementById('payment_amount').value = amount.toFixed(2);
+    document.getElementById('amount_input').value = amount.toFixed(2);
+}
+
+// Update amount input when payment amount changes
+document.getElementById('payment_amount').addEventListener('input', function() {
+    const amount = parseFloat(this.value) || 0;
+    document.getElementById('amount_input').value = amount.toFixed(2);
 });
 </script>
 {% endblock %}

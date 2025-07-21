@@ -60,11 +60,6 @@
                                                     {{ student.overdue_count }} item{{ student.overdue_count|pluralize }}
                                                 </small>
                                             </div>
-                                            <div class="mt-2">
-                                                <a href="{% url 'payment' student.id %}?overdue=true" class="btn btn-sm btn-danger">
-                                                    <i class="fas fa-exclamation-triangle me-1"></i> Pay Past Due
-                                                </a>
-                                            </div>
                                         {% else %}
                                             <span class="text-muted">No overdue items</span>
                                         {% endif %}
