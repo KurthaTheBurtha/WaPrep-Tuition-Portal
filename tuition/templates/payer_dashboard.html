@@ -114,7 +114,7 @@
     <!-- Summary Cards -->
     <div class="row mt-4">
         <!-- Ask a Question Card -->
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -132,7 +132,7 @@
             </div>
         </div>
         <!-- Add Payment Method Card -->
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
@@ -144,6 +144,24 @@
                             <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success btn-sm">
                                 Add Payment Method
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Policies Card -->
+        <div class="col-12 col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-file-contract text-info fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Policies</h6>
+                            <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#policiesModal">
+                                View Policies
+                            </button>
                         </div>
                     </div>
                 </div>
