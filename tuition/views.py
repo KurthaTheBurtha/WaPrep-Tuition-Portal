@@ -3361,12 +3361,18 @@ def payer_view_upcoming_bills(request, student_id):
             monthly_billing[month_key]['unpaid_amount'] += bill.amount
             monthly_billing[month_key]['unpaid_bills'] += 1
 
+    # Get current month for default expansion
+    from datetime import datetime
+    current_month_key = datetime.now().strftime('%Y-%m')
+    
     # Create the final sorted months list in billing cycle order
     sorted_months = []
     for month_key, month_display in billing_cycle_months:
         if month_key in monthly_billing:
             # Month has bills, use existing data
-            sorted_months.append((month_key, monthly_billing[month_key]))
+            month_data = monthly_billing[month_key].copy()
+            month_data['is_current_month'] = (month_key == current_month_key)
+            sorted_months.append((month_key, month_data))
         else:
             # Month has no bills, create empty entry
             sorted_months.append((month_key, {
@@ -3378,7 +3384,8 @@ def payer_view_upcoming_bills(request, student_id):
                 'unpaid_amount': 0,
                 'total_bills': 0,
                 'paid_bills': 0,
-                'unpaid_bills': 0
+                'unpaid_bills': 0,
+                'is_current_month': (month_key == current_month_key)
             }))
     
     # Calculate student totals

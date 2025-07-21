@@ -123,7 +123,6 @@
                                     <th class="border-0">Status</th>
                                     <th class="border-0">Payer(s)</th>
                                     <th class="border-0">Notes</th>
-                                    <th class="border-0 text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -186,19 +185,14 @@
                                                     data-bs-target="#editNotesModal"
                                                     data-student-id="{{ student.id }}"
                                                     data-student-name="{{ student.first_name }} {{ student.last_name }}">
-                                                <i class="fas fa-plus text-muted me-1"></i>
-                                                Add Notes
+                                                <span class="text-muted">-</span>
                                             </button>
                                         {% endif %}
-                                    </td>
-                                   
-                                    <td class="text-end pe-4">
-                                        <!-- Student Profile button removed -->
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center py-5">
+                                    <td colspan="5" class="text-center py-5">
                                         <div class="text-muted">
                                             <div class="mb-3">
                                                 <i class="fas fa-user-graduate fa-3x"></i>
