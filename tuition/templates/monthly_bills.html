@@ -146,10 +146,10 @@
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="border-0 ps-4">Description</th>
-                                        <th class="border-0">Due Date</th>
                                         <th class="border-0">Date Incurred</th>
+                                        <th class="border-0">Amount</th>
+                                        <th class="border-0">Due Date</th>
                                         <th class="border-0">Late Date</th>
-                                        <th class="border-0 text-end">Amount</th>
                                         <th class="border-0 text-center">Status</th>
                                         <th class="border-0 text-end pe-4">Actions</th>
                                     </tr>
@@ -167,10 +167,10 @@
                                         data-bill-late-date="{{ bill.late_date|date:'Y-m-d' }}"
                                         data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}">
                                         <td class="ps-4">{{ bill.description }}</td>
-                                        <td>{{ bill.due_date|date:"M d, Y" }}</td>
                                         <td>{{ bill.date_incurred|date:"M d, Y" }}</td>
+                                        <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>{{ bill.due_date|date:"M d, Y" }}</td>
                                         <td>{{ bill.late_date|date:"M d, Y" }}</td>
-                                        <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
                                         <td class="text-center">
                                             {% if bill.is_paid %}
                                                 <span class="badge bg-success">Paid</span>
@@ -398,6 +398,11 @@
                                placeholder="e.g., Tuition Payment, Activity Fee">
                     </div>
                     <div class="mb-3">
+                        <label for="date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="amount" class="form-label">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
@@ -409,11 +414,6 @@
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
                         <input type="date" name="due_date" id="due_date" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="date_incurred" class="form-label">Date Incurred</label>
-                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
-                        <div class="form-text">Leave blank to use today's date</div>
                     </div>
                     <div class="mb-3">
                         <label for="late_date" class="form-label">Late Date</label>
@@ -459,6 +459,11 @@
                                placeholder="e.g., Tuition Payment, Activity Fee">
                     </div>
                     <div class="mb-3">
+                        <label for="edit_date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="edit_date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="edit_amount" class="form-label">Amount</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
@@ -472,11 +477,6 @@
                         <input type="date" name="due_date" id="edit_due_date" class="form-control" 
                                min="{{ first_day|date:'Y-m-d' }}" max="{{ last_day|date:'Y-m-d' }}" required>
                         <div class="form-text">Must be within {{ month_display }}</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_date_incurred" class="form-label">Date Incurred</label>
-                        <input type="date" name="date_incurred" id="edit_date_incurred" class="form-control">
-                        <div class="form-text">Leave blank to use today's date</div>
                     </div>
                     <div class="mb-3">
                         <label for="edit_late_date" class="form-label">Late Date</label>

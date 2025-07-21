@@ -85,8 +85,10 @@
                             <thead class="bg-light">
                                 <tr>
                                     <th class="border-0 ps-4">Description</th>
-                                    <th class="border-0">Amount</th>
+                                    <th class="border-0">Date Incurred</th>
+                                    <th class="border-0 text-end">Amount</th>
                                     <th class="border-0">Due Date</th>
+                                    <th class="border-0">Late Date</th>
                                     <th class="border-0">Status</th>
                                     <th class="border-0">Show in History</th>
                                     <th class="border-0 text-end pe-4">Action</th>
@@ -116,8 +118,10 @@
                                             {% endif %}
                                             {{ bill.description }}
                                         </td>
-                                        <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>{{ bill.date_incurred|date:'M d, Y'|default:'-' }}</td>
+                                        <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
                                         <td>{{ bill.due_date|date:'M d, Y' }}</td>
+                                        <td>{{ bill.late_date|date:'M d, Y'|default:'-' }}</td>
                                         <td>
                                             {% if bill.is_overdue %}
                                                 <span class="badge bg-danger">Overdue</span>
@@ -162,7 +166,7 @@
                                 {% endfor %}
                                 {% if not bills %}
                                 <tr>
-                                    <td colspan="6" class="text-center py-5">
+                                    <td colspan="8" class="text-center py-5">
                                         <div class="text-muted">
                                             <div class="mb-3">
                                                 <i class="fas fa-file-invoice-dollar fa-3x"></i>
@@ -176,7 +180,7 @@
                                     {% with unpaid_bills=bills|dictsort:"is_paid"|dictsort:"due_date" %}
                                         {% if not unpaid_bills %}
                                         <tr>
-                                            <td colspan="6" class="text-center py-5">
+                                            <td colspan="8" class="text-center py-5">
                                                 <div class="text-success">
                                                     <div class="mb-3">
                                                         <i class="fas fa-check-circle fa-3x"></i>
@@ -213,8 +217,10 @@
                             <thead class="bg-light">
                                 <tr>
                                     <th class="border-0 ps-4">Description</th>
-                                    <th class="border-0">Amount</th>
+                                    <th class="border-0">Date Incurred</th>
+                                    <th class="border-0 text-end">Amount</th>
                                     <th class="border-0">Due Date</th>
+                                    <th class="border-0">Late Date</th>
                                     <th class="border-0">Status</th>
                                     <th class="border-0">Show in History</th>
                                     <th class="border-0 text-end pe-4">Action</th>
@@ -244,8 +250,10 @@
                                             {% endif %}
                                             {{ bill.description }}
                                         </td>
-                                        <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>{{ bill.date_incurred|date:'M d, Y'|default:'-' }}</td>
+                                        <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
                                         <td>{{ bill.due_date|date:'M d, Y' }}</td>
+                                        <td>{{ bill.late_date|date:'M d, Y'|default:'-' }}</td>
                                         <td>
                                             <span class="badge bg-success">Paid</span>
                                         </td>
@@ -286,7 +294,7 @@
                                 {% endfor %}
                                 {% if not bills %}
                                 <tr>
-                                    <td colspan="6" class="text-center py-5">
+                                    <td colspan="8" class="text-center py-5">
                                         <div class="text-muted">
                                             <div class="mb-3">
                                                 <i class="fas fa-receipt fa-3x"></i>
@@ -508,6 +516,11 @@
                         <input type="text" class="form-control" name="description" id="description" required>
                     </div>
                     <div class="mb-3">
+                        <label for="date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" class="form-control" name="date_incurred" id="date_incurred">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="amount" class="form-label">Amount ($)</label>
                         <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
                         <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
@@ -515,11 +528,6 @@
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" name="due_date" id="due_date" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="date_incurred" class="form-label">Date Incurred</label>
-                        <input type="date" class="form-control" name="date_incurred" id="date_incurred">
-                        <div class="form-text">Leave blank to use today's date</div>
                     </div>
                     <div class="mb-3">
                         <label for="late_date" class="form-label">Late Date</label>
@@ -573,6 +581,11 @@
                         <input type="text" class="form-control" name="description" id="edit_description" required>
                     </div>
                     <div class="mb-3">
+                        <label for="edit_date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" class="form-control" name="date_incurred" id="edit_date_incurred">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="edit_amount" class="form-label">Amount ($)</label>
                         <input type="number" step="0.01" class="form-control" name="amount" id="edit_amount" required>
                         <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
@@ -580,11 +593,6 @@
                     <div class="mb-3">
                         <label for="edit_due_date" class="form-label">Due Date</label>
                         <input type="date" class="form-control" name="due_date" id="edit_due_date" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_date_incurred" class="form-label">Date Incurred</label>
-                        <input type="date" class="form-control" name="date_incurred" id="edit_date_incurred">
-                        <div class="form-text">Leave blank to use today's date</div>
                     </div>
                     <div class="mb-3">
                         <label for="edit_late_date" class="form-label">Late Date</label>

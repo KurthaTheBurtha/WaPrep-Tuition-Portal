@@ -304,6 +304,11 @@
                                placeholder="e.g., Tuition Payment, Activity Fee">
                     </div>
                     <div class="mb-3">
+                        <label for="date_incurred" class="form-label">Date Incurred</label>
+                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
+                        <div class="form-text">Leave blank to use today's date</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="amount" class="form-label">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
@@ -315,11 +320,6 @@
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
                         <input type="date" name="due_date" id="due_date" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="date_incurred" class="form-label">Date Incurred</label>
-                        <input type="date" name="date_incurred" id="date_incurred" class="form-control">
-                        <div class="form-text">Leave blank to use today's date</div>
                     </div>
                     <div class="mb-3">
                         <label for="late_date" class="form-label">Late Date</label>
