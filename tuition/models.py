@@ -383,7 +383,7 @@ class BankAccount(models.Model):
     def __str__(self):
         return f"{self.nickname} (...{self.last4})"
 
-class PaymentBreakdown(models.Model):
+class PaymentBreakdown(models.Model, AuditMixin):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payment_breakdowns')
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -468,7 +468,7 @@ class PaymentBreakdown(models.Model):
     class Meta:
         ordering = ['-is_paid', 'due_date', 'created_at']
 
-class PaymentItem(models.Model):
+class PaymentItem(models.Model, AuditMixin):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='payment_items')
     breakdown_item = models.ForeignKey(PaymentBreakdown, on_delete=models.CASCADE, related_name='payment_items')
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
@@ -643,7 +643,7 @@ class AuditLog(models.Model):
             description=description or "",
             metadata=metadata or {},
             user_ip=user_ip,
-            user_agent=user_agent,
+            user_agent=user_agent or "",
             session_id=session_id or "",
             request_id=request_id or "",
         )

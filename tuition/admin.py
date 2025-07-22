@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     User, Student, StudentPayer, Payment, PaymentReceipt, PaymentReminder,
-    PaymentPlan, PaymentInstallment, AccountRequest, Vendor, PasswordReset, PasswordHistory, PaymentBreakdown
+    PaymentPlan, PaymentInstallment, AccountRequest, Vendor, PasswordReset, PasswordHistory, PaymentBreakdown,
+    AuditLog, SecurityEvent, SystemHealth, DataVersion
 )
 
 @admin.register(User)
@@ -126,3 +127,115 @@ class PaymentBreakdownAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+# Logging Admin Classes
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'action', 'model_name', 'record_id', 'user', 'field_name', 'description')
+    list_filter = ('action', 'model_name', 'timestamp')
+    search_fields = ('user__username', 'description', 'field_name')
+    readonly_fields = ('timestamp', 'user_ip', 'user_agent', 'session_id', 'request_id')
+    ordering = ('-timestamp',)
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('timestamp', 'action', 'model_name', 'record_id', 'user')
+        }),
+        ('Change Details', {
+            'fields': ('field_name', 'old_value', 'new_value', 'description')
+        }),
+        ('Request Information', {
+            'fields': ('user_ip', 'user_agent', 'session_id', 'request_id'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SecurityEvent)
+class SecurityEventAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'event_type', 'severity', 'user', 'resolved', 'description')
+    list_filter = ('event_type', 'severity', 'resolved', 'timestamp')
+    search_fields = ('user__username', 'description')
+    readonly_fields = ('timestamp', 'user_ip', 'user_agent')
+    ordering = ('-timestamp',)
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Event Information', {
+            'fields': ('timestamp', 'event_type', 'severity', 'description')
+        }),
+        ('User Information', {
+            'fields': ('user', 'user_ip', 'user_agent')
+        }),
+        ('Resolution', {
+            'fields': ('resolved', 'resolved_at', 'resolved_by')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(SystemHealth)
+class SystemHealthAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'component', 'status', 'message')
+    list_filter = ('component', 'status', 'timestamp')
+    search_fields = ('component', 'message')
+    readonly_fields = ('timestamp',)
+    ordering = ('-timestamp',)
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Health Information', {
+            'fields': ('timestamp', 'component', 'status', 'message')
+        }),
+        ('Metrics', {
+            'fields': ('metrics',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(DataVersion)
+class DataVersionAdmin(admin.ModelAdmin):
+    list_display = ('model_name', 'record_id', 'version_number', 'created_at', 'created_by')
+    list_filter = ('model_name', 'created_at')
+    search_fields = ('model_name', 'created_by__username')
+    readonly_fields = ('created_at', 'data_snapshot')
+    ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Version Information', {
+            'fields': ('model_name', 'record_id', 'version_number', 'created_at', 'created_by')
+        }),
+        ('Data Snapshot', {
+            'fields': ('data_snapshot',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
