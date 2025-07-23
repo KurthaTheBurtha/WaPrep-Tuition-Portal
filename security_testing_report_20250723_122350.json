@@ -1,0 +1,125 @@
+{
+  "timestamp": "2025-07-23T12:23:40.058260",
+  "tests": {
+    "csrf_/payment/process/": {
+      "status": "INFO",
+      "status_code": 500
+    },
+    "csrf_/students/delete/": {
+      "status": "INFO",
+      "status_code": 500
+    },
+    "csrf_/students/update/": {
+      "status": "INFO",
+      "status_code": 500
+    },
+    "csrf_/payer/edit-profile/": {
+      "status": "INFO",
+      "status_code": 500
+    }
+  },
+  "vulnerabilities": [
+    {
+      "type": "Authentication Bypass",
+      "severity": "CRITICAL",
+      "description": "Protected endpoint accessible without authentication: /payer/dashboard/",
+      "status_code": 200
+    },
+    {
+      "type": "Authentication Bypass",
+      "severity": "CRITICAL",
+      "description": "Protected endpoint accessible without authentication: /admin/dashboard/",
+      "status_code": 200
+    },
+    {
+      "type": "Authentication Bypass",
+      "severity": "CRITICAL",
+      "description": "Protected endpoint accessible without authentication: /students/",
+      "status_code": 200
+    },
+    {
+      "type": "Authentication Bypass",
+      "severity": "CRITICAL",
+      "description": "Protected endpoint accessible without authentication: /payment/history/",
+      "status_code": 200
+    },
+    {
+      "type": "Authentication Bypass",
+      "severity": "CRITICAL",
+      "description": "Protected endpoint accessible without authentication: /payer/profile/",
+      "status_code": 200
+    },
+    {
+      "type": "Brute Force Protection",
+      "severity": "HIGH",
+      "description": "No brute force protection detected on /login/payer/",
+      "failed_attempts": 10
+    },
+    {
+      "type": "Brute Force Protection",
+      "severity": "HIGH",
+      "description": "No brute force protection detected on /login/admin/",
+      "failed_attempts": 10
+    },
+    {
+      "type": "SQL Injection",
+      "severity": "CRITICAL",
+      "description": "SQL injection vulnerability detected on /login/payer/",
+      "payload": "' OR 1=1 --",
+      "response_length": 95163
+    },
+    {
+      "type": "SQL Injection",
+      "severity": "CRITICAL",
+      "description": "SQL injection vulnerability detected on /login/admin/",
+      "payload": "' OR 1=1 --",
+      "response_length": 95160
+    },
+    {
+      "type": "Authorization Bypass",
+      "severity": "CRITICAL",
+      "description": "Admin endpoint accessible without authentication: /admin/dashboard/",
+      "status_code": 200
+    },
+    {
+      "type": "Authorization Bypass",
+      "severity": "CRITICAL",
+      "description": "Admin endpoint accessible without authentication: /admin/reports/",
+      "status_code": 200
+    },
+    {
+      "type": "Authorization Bypass",
+      "severity": "CRITICAL",
+      "description": "Admin endpoint accessible without authentication: /students/add/",
+      "status_code": 200
+    },
+    {
+      "type": "Authorization Bypass",
+      "severity": "CRITICAL",
+      "description": "Admin endpoint accessible without authentication: /students/delete/",
+      "status_code": 200
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "Rate Limiting",
+      "priority": "MEDIUM",
+      "description": "Consider implementing rate limiting on /login/payer/"
+    },
+    {
+      "type": "Rate Limiting",
+      "priority": "MEDIUM",
+      "description": "Consider implementing rate limiting on /login/admin/"
+    },
+    {
+      "type": "Rate Limiting",
+      "priority": "MEDIUM",
+      "description": "Consider implementing rate limiting on /forgot-password/"
+    },
+    {
+      "type": "Rate Limiting",
+      "priority": "MEDIUM",
+      "description": "Consider implementing rate limiting on /request-account/"
+    }
+  ]
+}

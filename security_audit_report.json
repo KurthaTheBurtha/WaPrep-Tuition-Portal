@@ -1,0 +1,117 @@
+{
+  "timestamp": "2025-07-23T10:31:32.545605",
+  "checks": {
+    "django_security": {
+      "status": "PASS",
+      "message": "Django security check passed"
+    },
+    "authentication_protection": {
+      "status": "INFO",
+      "login_required_count": 39,
+      "admin_required_count": 1,
+      "payer_required_count": 1,
+      "unprotected_views": []
+    },
+    "http_methods": {
+      "status": "INFO",
+      "require_post_count": 3,
+      "require_http_methods_count": 0
+    },
+    "input_validation": {
+      "status": "INFO",
+      "form_classes": [
+        "AccountRequestForm",
+        "QuestionForm",
+        "BankAccountForm",
+        "BankAccountPaymentForm",
+        "PayerProfileForm",
+        "EditPayerProfileForm"
+      ],
+      "form_count": 6
+    },
+    "rate_limiting": {
+      "status": "PASS",
+      "rate_limiting_implemented": true
+    },
+    "https_configuration": {
+      "status": "PASS",
+      "settings": {
+        "SECURE_SSL_REDIRECT": true,
+        "SECURE_HSTS_SECONDS": true,
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS": true,
+        "SECURE_HSTS_PRELOAD": true
+      }
+    },
+    "error_handling": {
+      "status": "FAIL",
+      "debug_enabled": true
+    },
+    "password_policies": {
+      "status": "PASS",
+      "validators_present": [
+        "UserAttributeSimilarityValidator",
+        "MinimumLengthValidator",
+        "CommonPasswordValidator",
+        "NumericPasswordValidator"
+      ],
+      "expected_validators": [
+        "UserAttributeSimilarityValidator",
+        "MinimumLengthValidator",
+        "CommonPasswordValidator",
+        "NumericPasswordValidator"
+      ]
+    },
+    "session_management": {
+      "status": "FAIL",
+      "settings": {
+        "SESSION_COOKIE_SECURE": false,
+        "SESSION_COOKIE_HTTPONLY": true,
+        "SESSION_COOKIE_SAMESITE": "Lax",
+        "SESSION_EXPIRE_AT_BROWSER_CLOSE": false
+      }
+    },
+    "authorization": {
+      "status": "FAIL",
+      "admin_required_decorator": false,
+      "payer_required_decorator": false
+    },
+    "logging_monitoring": {
+      "status": "PASS",
+      "audit_logging_enabled": true,
+      "security_logging_enabled": true
+    },
+    "dependencies": {
+      "status": "ERROR",
+      "message": "[WinError 2] The system cannot find the file specified"
+    },
+    "environment_security": {
+      "status": "PASS",
+      "env_file_exists": true,
+      "hardcoded_secrets_found": false
+    }
+  },
+  "vulnerabilities": [
+    {
+      "type": "Error Handling",
+      "severity": "HIGH",
+      "description": "DEBUG mode is enabled in production"
+    },
+    {
+      "type": "Session Management",
+      "severity": "MEDIUM",
+      "description": "Session security settings not fully configured"
+    },
+    {
+      "type": "Authorization",
+      "severity": "HIGH",
+      "description": "Authorization decorators not fully implemented"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "HTTP Methods",
+      "priority": "MEDIUM",
+      "description": "Consider adding @require_POST to sensitive operations"
+    }
+  ]
+}

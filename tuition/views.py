@@ -3,6 +3,8 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.views.decorators.http import require_POST
+from .decorators import admin_required, payer_required
 from django.utils import timezone
 from datetime import datetime, timedelta, date
 from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem, PasswordReset
@@ -287,6 +289,7 @@ def payment(request, student_id):
     return render(request, 'payment.html', context)
 
 @login_required
+@require_POST
 def process_payment(request):
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -821,11 +824,8 @@ def payment_detail(request, payment_id):
     return render(request, 'payment_detail.html', context)
 
 @login_required
+@admin_required
 def admin_dashboard(request):
-    # Only accessible by admins
-    if request.user.user_type != 'admin':
-        messages.error(request, 'You do not have permission to access this page.')
-        return redirect('payer_login')
     
     # In a real application, these would come from a database
     context = {
@@ -1087,6 +1087,7 @@ def add_student(request):
     return redirect('students')
 
 @login_required
+@require_POST
 def delete_student(request):
     # Only allow payer users
     if request.user.user_type != 'admin':
@@ -1130,6 +1131,7 @@ def update_student_notes(request):
     return redirect('students')
 
 @login_required
+@require_POST
 def update_student(request):
     # Only allow admin users
     if request.user.user_type != 'admin':
@@ -1564,11 +1566,8 @@ def admin_reports(request):
     return render(request, 'admin_reports.html', context)
 
 @login_required
+@payer_required
 def payer_dashboard(request):
-    # Only allow payer users
-    if request.user.user_type != 'payer':
-        messages.error(request, 'You do not have permission to access this page.')
-        return redirect('payer_login')
     
     # Get students already associated with this payer
     my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
