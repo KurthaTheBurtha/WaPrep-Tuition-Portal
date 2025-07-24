@@ -289,10 +289,12 @@
                                                min="0.01" 
                                                max="{{ total_amount_due }}" 
                                                value="{{ total_amount_due }}"
-                                               required>
+                                               required
+                                               onchange="validatePaymentAmount(this)"
+                                               oninput="updateHiddenAmount(this)">
                                     </div>
                                     <div class="form-text">
-                                        Enter the amount you want to pay. The system will automatically apply it to your bills in order of urgency.
+                                        Enter the amount you want to pay (maximum ${{ total_amount_due|floatformat:2 }}). The system will automatically apply it to your bills in order of urgency.
                                     </div>
                                 </div>
                                 
@@ -661,6 +663,29 @@ function showNextActionAlert(message, hostedUrl) {
 document.getElementById('stripe-payment-form')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    // Enhanced validation for payment amount
+    const paymentAmountInput = document.getElementById('payment_amount');
+    const paymentAmount = parseFloat(paymentAmountInput.value) || 0;
+    
+    if (paymentAmount <= 0) {
+        alert('Payment amount must be greater than $0.');
+        paymentAmountInput.focus();
+        return;
+    }
+    
+    // Additional validation - ensure amount is reasonable
+    if (paymentAmount > 100000) {
+        alert('Payment amount exceeds maximum allowed limit of $100,000.');
+        paymentAmountInput.focus();
+        return;
+    }
+    
+    // Update hidden amount field one more time before submission
+    const hiddenAmount = document.getElementById('amount_input');
+    if (hiddenAmount) {
+        hiddenAmount.value = paymentAmount.toFixed(2);
+    }
+    
     const submitButton = document.getElementById('submit-btn');
     const originalText = submitButton.innerHTML;
     submitButton.disabled = true;
@@ -720,10 +745,48 @@ function setPaymentAmount(amount) {
     document.getElementById('amount_input').value = amount.toFixed(2);
 }
 
+// Validate payment amount
+function validatePaymentAmount(input) {
+    const amount = parseFloat(input.value) || 0;
+    if (amount <= 0) {
+        alert('Payment amount must be greater than $0.');
+        input.value = '{{ total_amount_due }}';
+        input.focus();
+        return false;
+    }
+    return true;
+}
+
 // Update amount input when payment amount changes
 document.getElementById('payment_amount').addEventListener('input', function() {
     const amount = parseFloat(this.value) || 0;
+    const maxAmount = {{ total_amount_due }};
+    
+    // Ensure amount doesn't exceed maximum
+    if (amount > maxAmount) {
+        this.value = maxAmount.toFixed(2);
+        amount = maxAmount;
+    }
+    
     document.getElementById('amount_input').value = amount.toFixed(2);
 });
+
+// Function to update hidden amount field
+function updateHiddenAmount(input) {
+    const amount = parseFloat(input.value) || 0;
+    const maxAmount = {{ total_amount_due }};
+    
+    // Ensure amount doesn't exceed maximum
+    if (amount > maxAmount) {
+        input.value = maxAmount.toFixed(2);
+        amount = maxAmount;
+    }
+    
+    // Update hidden amount field
+    const hiddenAmount = document.getElementById('amount_input');
+    if (hiddenAmount) {
+        hiddenAmount.value = amount.toFixed(2);
+    }
+}
 </script>
 {% endblock %}

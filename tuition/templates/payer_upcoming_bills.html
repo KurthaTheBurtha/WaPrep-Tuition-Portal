@@ -83,14 +83,7 @@
                                                 </tbody>
                                             </table>
                                         </div>
-                                        <div class="mt-3">
-                                            <div>
-                                                <strong>Month Total: ${{ month_data.total_amount|floatformat:2 }}</strong>
-                                                {% if month_data.unpaid_amount > 0 %}
-                                                    <span class="text-danger ms-3">Unpaid: ${{ month_data.unpaid_amount|floatformat:2 }}</span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
+
                                     {% else %}
                                         <div class="text-center py-4">
                                             <div class="text-muted">

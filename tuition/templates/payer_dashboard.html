@@ -73,7 +73,7 @@
                                     <td>
                                         {% if student.upcoming_amount > 0 %}
                                             <div class="d-flex flex-column">
-                                                <span class="fw-bold">${{ student.upcoming_amount|floatformat:2 }}</span>
+                                                <span class="fw-bold text-success">${{ student.upcoming_amount|floatformat:2 }}</span>
                                                 <small class="text-muted">
                                                     {{ student.upcoming_count }} item{{ student.upcoming_count|pluralize }}
                                                 </small>

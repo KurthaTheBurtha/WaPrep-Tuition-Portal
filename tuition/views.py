@@ -298,6 +298,22 @@ def process_payment(request):
         payment_intent_id = request.POST.get('payment_intent_id')
         saved_payment_method_id = request.POST.get('saved_payment_method_id')
         
+        # Enhanced validation for amount
+        try:
+            amount_float = float(amount) if amount else 0
+        except (ValueError, TypeError):
+            amount_float = 0
+        
+        # Validate amount is greater than 0
+        if not amount or amount_float <= 0:
+            messages.error(request, 'Payment amount must be greater than $0.')
+            return redirect('payer_dashboard')
+        
+        # Additional safety check - ensure amount is reasonable
+        if amount_float > 100000:  # $100,000 limit
+            messages.error(request, 'Payment amount exceeds maximum allowed limit.')
+            return redirect('payer_dashboard')
+        
         try:
             # Handle saved payment method
             if saved_payment_method_id:
@@ -310,7 +326,7 @@ def process_payment(request):
                 # Create a PaymentIntent using the saved payment method
                 customer_id = get_or_create_stripe_customer(request.user)
                 payment_intent = stripe.PaymentIntent.create(
-                    amount=int(float(amount) * 100),
+                    amount=int(amount_float * 100),  # Use validated amount
                     currency='usd',
                     customer=customer_id,
                     payment_method=actual_payment_method_id,
@@ -405,11 +421,16 @@ def process_payment(request):
                         due_date__lte=end_of_month
                     )
                 
+                # Final validation before creating payment record
+                if amount_float <= 0:
+                    messages.error(request, 'Invalid payment amount. Payment cannot be processed.')
+                    return redirect('payer_dashboard')
+                
                 # Create payment record only after confirming success
                 payment = Payment.objects.create(
                     student=student,
                     payer=request.user,  # Set the payer who made the payment
-                    amount=amount,
+                    amount=amount_float,  # Use validated amount
                     status='completed',
                     payment_method=payment_method_type,  # Save the payment method type
                     bank_account=None,  # No bank account reference stored
@@ -417,7 +438,7 @@ def process_payment(request):
                 )
                 
                 # Create PaymentItem records to link payment to breakdown items
-                total_payment_amount = Decimal(str(amount))
+                total_payment_amount = Decimal(str(amount_float))  # Use validated amount
                 
                 # Get all unpaid bills and categorize them by priority
                 from datetime import datetime, timedelta
@@ -535,7 +556,7 @@ def process_payment(request):
                 elif payment_method_type == 'us_bank_account':
                     payment_method_name = f"bank account ending in {pm.us_bank_account.last4}"
                 
-                messages.success(request, f"✅ Payment of ${amount} completed successfully using {payment_method_name}. A receipt is now available.")
+                messages.success(request, f"✅ Payment of ${amount_float:.2f} completed successfully using {payment_method_name}. A receipt is now available.")
                 return redirect('payment_history')
                 
             elif payment_intent.status == 'processing':
@@ -544,19 +565,19 @@ def process_payment(request):
                 payment = Payment.objects.create(
                     student=student,
                     payer=request.user,  # Set the payer who made the payment
-                    amount=amount,
+                    amount=amount_float,  # Use validated amount
                     status='pending',
                     payment_method=payment_method_type,  # Save the payment method type
                     bank_account=None,  # No bank account reference stored
                     receipt_number=payment_intent.id
                 )
                 
-                messages.info(request, f"Payment of ${amount} is being processed. You'll receive a confirmation once it's completed.")
+                messages.info(request, f"Payment of ${amount_float:.2f} is being processed. You'll receive a confirmation once it's completed.")
                 return redirect('payment_history')
                 
             elif payment_intent.status == 'requires_capture':
                 # Payment requires capture (for manual capture scenarios)
-                messages.warning(request, f"Payment of ${amount} requires manual capture. Please contact support.")
+                messages.warning(request, f"Payment of ${amount_float:.2f} requires manual capture. Please contact support.")
                 return redirect('payment_history')
                 
             else:
@@ -1944,6 +1965,22 @@ def monthly_bills(request, student_id, month_key):
             notes = request.POST.get('notes', '')
             bill_ids = request.POST.getlist('bill_ids')
             
+            # Enhanced validation for amount
+            try:
+                amount_float = float(amount) if amount else 0
+            except (ValueError, TypeError):
+                amount_float = 0
+            
+            # Validate amount is greater than 0
+            if not amount or amount_float <= 0:
+                messages.error(request, 'Payment amount must be greater than $0.')
+                return redirect('monthly_bills', student_id=student_id, month_key=month_key)
+            
+            # Additional safety check - ensure amount is reasonable
+            if amount_float > 100000:  # $100,000 limit
+                messages.error(request, 'Payment amount exceeds maximum allowed limit.')
+                return redirect('monthly_bills', student_id=student_id, month_key=month_key)
+            
             try:
                 payer = User.objects.get(id=payer_id, user_type='payer')
                 
@@ -2567,6 +2604,22 @@ def student_bills(request, student_id):
             payment_method = request.POST.get('payment_method', 'manual')
             notes = request.POST.get('notes', '')
             bill_ids = request.POST.getlist('bill_ids')
+            
+            # Enhanced validation for amount
+            try:
+                amount_float = float(amount) if amount else 0
+            except (ValueError, TypeError):
+                amount_float = 0
+            
+            # Validate amount is greater than 0
+            if not amount or amount_float <= 0:
+                messages.error(request, 'Payment amount must be greater than $0.')
+                return redirect('student_bills', student_id=student.id)
+            
+            # Additional safety check - ensure amount is reasonable
+            if amount_float > 100000:  # $100,000 limit
+                messages.error(request, 'Payment amount exceeds maximum allowed limit.')
+                return redirect('student_bills', student_id=student.id)
             
             try:
                 payer = User.objects.get(id=payer_id, user_type='payer')
