@@ -240,19 +240,19 @@
                             <div class="col-md-6">
                                 <h6 class="mb-2">Payment Summary</h6>
                                 {% if overdue_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1">
+                                    <div class="d-flex justify-content-between mb-1 amount-box overdue-box">
                                         <span class="text-danger">Overdue:</span>
                                         <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
                                     </div>
                                 {% endif %}
                                 {% if current_month_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1">
+                                    <div class="d-flex justify-content-between mb-1 amount-box current-box">
                                         <span class="text-warning">Current Month:</span>
                                         <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
                                     </div>
                                 {% endif %}
                                 {% if future_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1">
+                                    <div class="d-flex justify-content-between mb-1 amount-box future-box">
                                         <span class="text-info">Future:</span>
                                         <span class="text-info">${{ future_total|floatformat:2 }}</span>
                                     </div>
@@ -548,6 +548,29 @@
     border-radius: 0.75rem;
     padding: 1.5rem;
     border-left: 4px solid #007bff;
+}
+
+/* Amount box styling */
+.amount-box {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    border: 1px solid;
+}
+
+.overdue-box {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+}
+
+.current-box {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+}
+
+.future-box {
+    background-color: #d1ecf1;
+    border-color: #17a2b8;
 }
 
 .payment-breakdown .table {
