@@ -141,6 +141,19 @@ STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 
 # LOGGING CONFIGURATION
+# Create logs directory if it doesn't exist
+import os
+logs_dir = BASE_DIR / 'logs'
+if not logs_dir.exists():
+    try:
+        logs_dir.mkdir(exist_ok=True)
+    except (OSError, PermissionError):
+        # If we can't create logs directory, use console-only logging
+        pass
+
+# Determine if we can use file logging
+can_use_file_logging = logs_dir.exists() and os.access(logs_dir, os.W_OK)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -179,43 +192,8 @@ LOGGING = {
     'handlers': {
         'console': {
             'level': 'INFO',
-            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'audit_file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'audit.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 10,
-            'formatter': 'audit',
-            'filters': ['audit_filter'],
-        },
-        'security_file': {
-            'level': 'WARNING',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'security.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 10,
-            'formatter': 'security',
-            'filters': ['security_filter'],
-        },
-        'error_file': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'error.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
         },
         'mail_admins': {
             'level': 'ERROR',
@@ -226,41 +204,90 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file', 'error_file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['error_file', 'mail_admins'],
+            'handlers': ['console', 'mail_admins'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.security': {
-            'handlers': ['security_file', 'mail_admins'],
+            'handlers': ['console', 'mail_admins'],
             'level': 'WARNING',
             'propagate': False,
         },
         'tuition.audit': {
-            'handlers': ['audit_file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'tuition.security': {
-            'handlers': ['security_file', 'mail_admins'],
+            'handlers': ['console', 'mail_admins'],
             'level': 'WARNING',
             'propagate': False,
         },
         'tuition.monitoring': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
     },
 }
+
+# Add file handlers only if we can write to logs directory
+if can_use_file_logging:
+    LOGGING['handlers'].update({
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': logs_dir / 'django.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'audit_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': logs_dir / 'audit.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 10,
+            'formatter': 'audit',
+            'filters': ['audit_filter'],
+        },
+        'security_file': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': logs_dir / 'security.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 10,
+            'formatter': 'security',
+            'filters': ['security_filter'],
+        },
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': logs_dir / 'error.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    })
+    
+    # Update loggers to include file handlers
+    LOGGING['loggers']['django']['handlers'].append('file')
+    LOGGING['loggers']['django']['handlers'].append('error_file')
+    LOGGING['loggers']['django.request']['handlers'].append('error_file')
+    LOGGING['loggers']['django.security']['handlers'].append('security_file')
+    LOGGING['loggers']['tuition.audit']['handlers'].append('audit_file')
+    LOGGING['loggers']['tuition.security']['handlers'].append('security_file')
+    LOGGING['loggers']['tuition.monitoring']['handlers'].append('file')
+    LOGGING['root']['handlers'].append('file')
 
 # AUDIT LOGGING SETTINGS
 AUDIT_LOG_ENABLED = True
