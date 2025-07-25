@@ -69,7 +69,7 @@ This checklist provides a systematic approach to testing the WaPrep Tuition Port
 - [ ] **Password Strength**: Weak passwords are rejected
 - [ ] **Password History**: Cannot reuse recent passwords
 - [ ] **Account Lockout**: Multiple failed attempts lock account
-- [ ] **Two-Factor Authentication**: 2FA setup and verification
+
 - [ ] **Password Reset**: Forgot password functionality works
 - [ ] **Account Activation**: New account activation process
 - [ ] **Session Security**: Sessions are properly secured
