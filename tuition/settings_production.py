@@ -137,8 +137,18 @@ if static_dir.exists():
 else:
     STATICFILES_DIRS = []
 
+# Add tuition app static files directory
+tuition_static_dir = BASE_DIR / "tuition" / "static"
+if tuition_static_dir.exists() and tuition_static_dir not in STATICFILES_DIRS:
+    STATICFILES_DIRS.append(tuition_static_dir)
+
 # Static files storage - use simple storage for now
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Whitenoise settings for better static file serving
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
+WHITENOISE_MAX_AGE = 31536000  # 1 year
 
 # DEFAULT PRIMARY KEY FIELD TYPE
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

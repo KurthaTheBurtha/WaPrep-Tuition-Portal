@@ -113,6 +113,11 @@ if static_dir.exists():
 else:
     STATICFILES_DIRS = []
 
+# Add tuition app static files directory
+tuition_static_dir = BASE_DIR / "tuition" / "static"
+if tuition_static_dir.exists() and tuition_static_dir not in STATICFILES_DIRS:
+    STATICFILES_DIRS.append(tuition_static_dir)
+
 # DEFAULT PRIMARY KEY FIELD TYPE
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
