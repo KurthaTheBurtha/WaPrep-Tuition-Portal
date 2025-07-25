@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Page Not Found - WAPrep Tuition{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="error-page">
+                <h1 class="display-1 text-muted">404</h1>
+                <h2 class="mb-4">Page Not Found</h2>
+                <p class="lead mb-4">The page you're looking for doesn't exist or has been moved.</p>
+                <div class="mb-4">
+                    <a href="{% url 'tuition:home' %}" class="btn btn-primary">Go to Homepage</a>
+                    <button onclick="history.back()" class="btn btn-secondary">Go Back</button>
+                </div>
+                <div class="text-muted">
+                    <small>If you believe this is an error, please contact support.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-page {
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.display-1 {
+    font-size: 6rem;
+    font-weight: bold;
+    color: #6c757d;
+}
+
+.lead {
+    font-size: 1.25rem;
+    color: #495057;
+}
+</style>
+{% endblock %} 

@@ -62,4 +62,7 @@ urlpatterns = [
     path('monitoring/security-events/', views.security_events, name='security_events'),
     path('mass-add-bills/', views.mass_add_bills, name='mass_add_bills'),
     path('mass-billing-actions/', views.mass_billing_actions, name='mass_billing_actions'),
-]  
+]
+
+# Custom 404 handler
+handler404 = 'tuition.views.custom_404'  

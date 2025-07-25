@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 from .decorators import admin_required, payer_required
 from django.utils import timezone
 from datetime import datetime, timedelta, date
-from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem, PasswordReset
+from .models import User, Student, Payment, StudentPayer, BankAccount, PaymentBreakdown, Card, PaymentItem, PasswordReset, AccountRequest
 import random
 import string
 from django.core.mail import send_mail
@@ -1709,7 +1709,7 @@ Please review and follow up accordingly.
             send_mail(
                 subject,
                 message,  
-                config('DEFAULT_FROM_EMAIL'),  # Uses DEFAULT_FROM_EMAIL
+                settings.DEFAULT_FROM_EMAIL,  # Use settings instead of config
                 ['info@waprep.org'],
                 fail_silently=False,
             )
@@ -3159,103 +3159,122 @@ def health_check(request):
     """
     Health check endpoint for monitoring systems.
     """
-    from .utils import log_system_health
-    from .models import AuditLog, SecurityEvent, SystemHealth
-    import psutil
-    
-    health_status = {
-        'status': 'healthy',
-        'timestamp': timezone.now().isoformat(),
-        'checks': {}
-    }
-    
-    # Database health check
     try:
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-        health_status['checks']['database'] = {'status': 'healthy', 'message': 'Database connection OK'}
-    except Exception as e:
-        health_status['checks']['database'] = {'status': 'critical', 'message': f'Database error: {str(e)}'}
-        health_status['status'] = 'critical'
-    
-    # System resource checks
-    try:
-        # Memory usage
-        memory = psutil.virtual_memory()
-        memory_status = 'healthy'
-        if memory.percent > 90:
-            memory_status = 'critical'
-        elif memory.percent > 80:
-            memory_status = 'warning'
+        from .utils import log_system_health
+        from .models import AuditLog, SecurityEvent, SystemHealth
+        import psutil
         
-        health_status['checks']['memory'] = {
-            'status': memory_status,
-            'message': f'Memory usage: {memory.percent:.1f}%',
-            'usage_percent': memory.percent
+        health_status = {
+            'status': 'healthy',
+            'timestamp': timezone.now().isoformat(),
+            'checks': {}
         }
         
-        if memory_status != 'healthy':
-            health_status['status'] = 'warning'
+        # Database health check
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            health_status['checks']['database'] = {'status': 'healthy', 'message': 'Database connection OK'}
+        except Exception as e:
+            health_status['checks']['database'] = {'status': 'critical', 'message': f'Database error: {str(e)}'}
+            health_status['status'] = 'critical'
         
-        # Disk usage
-        disk = psutil.disk_usage('.')
-        disk_status = 'healthy'
-        if disk.percent > 90:
-            disk_status = 'critical'
-        elif disk.percent > 80:
-            disk_status = 'warning'
-        
-        health_status['checks']['disk'] = {
-            'status': disk_status,
-            'message': f'Disk usage: {disk.percent:.1f}%',
-            'usage_percent': disk.percent
-        }
-        
-        if disk_status != 'healthy':
-            health_status['status'] = 'warning'
+        # System resource checks
+        try:
+            # Memory usage
+            memory = psutil.virtual_memory()
+            memory_status = 'healthy'
+            if memory.percent > 90:
+                memory_status = 'critical'
+            elif memory.percent > 80:
+                memory_status = 'warning'
             
+            health_status['checks']['memory'] = {
+                'status': memory_status,
+                'message': f'Memory usage: {memory.percent:.1f}%',
+                'usage_percent': memory.percent
+            }
+            
+            if memory_status != 'healthy':
+                health_status['status'] = 'warning'
+            
+            # Disk usage
+            disk = psutil.disk_usage('.')
+            disk_status = 'healthy'
+            if disk.percent > 90:
+                disk_status = 'critical'
+            elif disk.percent > 80:
+                disk_status = 'warning'
+            
+            health_status['checks']['disk'] = {
+                'status': disk_status,
+                'message': f'Disk usage: {disk.percent:.1f}%',
+                'usage_percent': disk.percent
+            }
+            
+            if disk_status != 'healthy':
+                health_status['status'] = 'warning'
+                
+        except Exception as e:
+            health_status['checks']['system'] = {'status': 'critical', 'message': f'System check error: {str(e)}'}
+            health_status['status'] = 'critical'
+        
+        # Audit system health
+        try:
+            recent_logs = AuditLog.objects.filter(
+                timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
+            ).count()
+            
+            recent_security_events = SecurityEvent.objects.filter(
+                timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
+            ).count()
+            
+            audit_status = 'healthy'
+            if recent_security_events > 10:
+                audit_status = 'warning'
+            
+            health_status['checks']['audit_system'] = {
+                'status': audit_status,
+                'message': f'Audit logs: {recent_logs}, Security events: {recent_security_events}',
+                'recent_logs': recent_logs,
+                'recent_security_events': recent_security_events
+            }
+            
+        except Exception as e:
+            health_status['checks']['audit_system'] = {'status': 'critical', 'message': f'Audit system error: {str(e)}'}
+            health_status['status'] = 'critical'
+        
+        # Log the health check
+        try:
+            log_system_health(
+                'health_check_endpoint',
+                health_status['status'].upper(),
+                f"Health check completed with status: {health_status['status']}",
+                health_status['checks']
+            )
+        except Exception as e:
+            # Don't fail the health check if logging fails
+            health_status['checks']['logging'] = {'status': 'warning', 'message': f'Logging error: {str(e)}'}
+        
+        return JsonResponse(health_status)
+        
     except Exception as e:
-        health_status['checks']['system'] = {'status': 'critical', 'message': f'System check error: {str(e)}'}
-        health_status['status'] = 'critical'
-    
-    # Audit system health
-    try:
-        recent_logs = AuditLog.objects.filter(
-            timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
-        ).count()
-        
-        recent_security_events = SecurityEvent.objects.filter(
-            timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
-        ).count()
-        
-        audit_status = 'healthy'
-        if recent_security_events > 10:
-            audit_status = 'warning'
-        
-        health_status['checks']['audit_system'] = {
-            'status': audit_status,
-            'message': f'Audit logs: {recent_logs}, Security events: {recent_security_events}',
-            'recent_logs': recent_logs,
-            'recent_security_events': recent_security_events
+        # Catch any unexpected errors and return a proper error response
+        error_response = {
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': timezone.now().isoformat()
         }
-        
-    except Exception as e:
-        health_status['checks']['audit_system'] = {'status': 'critical', 'message': f'Audit system error: {str(e)}'}
-        health_status['status'] = 'critical'
-    
-    # Log the health check
-    log_system_health(
-        'health_check_endpoint',
-        health_status['status'].upper(),
-        f"Health check completed with status: {health_status['status']}",
-        health_status['checks']
-    )
-    
-    return JsonResponse(health_status)
+        return JsonResponse(error_response, status=500)
 
 
+def custom_404(request, exception):
+    """
+    Custom 404 error handler.
+    """
+    return render(request, '404.html', status=404)
 @login_required
 def audit_summary(request):
     """
