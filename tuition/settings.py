@@ -21,6 +21,8 @@ ALLOWED_HOSTS = [
     '.render.com',   # Render domains
     '.onrender.com', # Render domains
     '.herokuapp.com', # Heroku domains
+    'www.waprepauthorizeduser.org',  # Your custom domain
+    'waprepauthorizeduser.org',  # Your custom domain without www
 ]
 
 # APPLICATIONS
@@ -340,6 +342,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'https://localhost:8000',
     'https://127.0.0.1:8000',
+    'https://www.waprepauthorizeduser.org',
+    'https://waprepauthorizeduser.org',
 ]
 
 # Content Security
