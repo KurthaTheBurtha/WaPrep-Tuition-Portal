@@ -4,6 +4,15 @@ set -o errexit
 
 echo "=== WaPrep Tuition Portal Build Script ==="
 echo "Installing dependencies..."
+
+# Try to install psycopg3 first, fallback to psycopg2 if needed
+echo "Installing PostgreSQL adapter..."
+pip install psycopg[binary]>=3.1.0 || {
+    echo "psycopg3 failed, trying psycopg2-binary..."
+    pip install psycopg2-binary==2.9.9
+}
+
+echo "Installing remaining dependencies..."
 pip install -r requirements.txt
 
 echo "Collecting static files..."
