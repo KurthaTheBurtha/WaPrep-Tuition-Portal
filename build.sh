@@ -2,6 +2,7 @@
 # exit on error
 set -o errexit
 
+echo "=== WaPrep Tuition Portal Build Script ==="
 echo "Installing dependencies..."
 pip install -r requirements.txt
 
@@ -23,5 +24,8 @@ python manage.py showmigrations
 
 echo "Creating default admin user if it doesn't exist..."
 python manage.py create_admin --first_name "Admin" --last_name "User" --email "admin@waprep.org" --password "Admin123!@#" || echo "Admin user already exists or error occurred"
+
+echo "Verifying WSGI application..."
+python -c "from tuition.wsgi import application; print('WSGI application loaded successfully')"
 
 echo "Build completed successfully!"
