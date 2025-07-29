@@ -147,7 +147,8 @@
                                     <tr>
                                         <th class="border-0 ps-4">Description</th>
                                         <th class="border-0">Date Incurred</th>
-                                        <th class="border-0">Amount</th>
+                                        <th class="border-0">Amount Incurred</th>
+                                        <th class="border-0">Unpaid Amount</th>
                                         <th class="border-0">Due Date</th>
                                         <th class="border-0">Late Date</th>
                                         <th class="border-0 text-center">Status</th>
@@ -169,15 +170,26 @@
                                         <td class="ps-4">{{ bill.description }}</td>
                                         <td>{{ bill.date_incurred|date:"M d, Y" }}</td>
                                         <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>
+                                            {% if bill.remaining_amount == 0 %}
+                                                <span class="text-success">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% elif bill.remaining_amount < bill.amount %}
+                                                <span class="text-warning">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-danger">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ bill.due_date|date:"M d, Y" }}</td>
                                         <td>{{ bill.late_date|date:"M d, Y" }}</td>
                                         <td class="text-center">
-                                            {% if bill.is_paid %}
+                                            {% if bill.payment_status == 'Paid' %}
                                                 <span class="badge bg-success">Paid</span>
+                                            {% elif bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning">Partially Paid</span>
                                             {% elif bill.is_overdue %}
                                                 <span class="badge bg-danger">Overdue</span>
                                             {% else %}
-                                                <span class="badge bg-warning">Unpaid</span>
+                                                <span class="badge bg-danger">Unpaid</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-end pe-4">
