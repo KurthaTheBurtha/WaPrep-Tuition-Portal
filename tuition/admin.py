@@ -108,25 +108,59 @@ class PasswordHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentBreakdown)
 class PaymentBreakdownAdmin(admin.ModelAdmin):
-    list_display = ('student', 'description', 'amount', 'due_date', 'date_incurred', 'late_date', 'is_paid', 'show_in_payment_history', 'created_at')
-    list_filter = ('is_paid', 'show_in_payment_history', 'due_date', 'created_at', 'late_date', 'date_incurred')
-    search_fields = ('student__first_name', 'student__last_name', 'description')
+    list_display = ('student', 'description', 'amount', 'remaining_amount_display', 'payment_status_display', 'due_date', 'date_incurred', 'late_date', 'is_paid', 'show_in_payment_history', 'created_at')
+    list_filter = ('is_paid', 'show_in_payment_history', 'due_date', 'created_at', 'late_date', 'date_incurred', 'student__grade', 'student__status')
+    search_fields = ('student__first_name', 'student__last_name', 'student__student_id', 'description')
     list_editable = ('is_paid', 'show_in_payment_history')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'remaining_amount_display', 'payment_status_display', 'is_fully_paid_display', 'amount')
     ordering = ('-due_date', '-created_at')
+    date_hierarchy = 'created_at'
+    list_per_page = 50
     
     fieldsets = (
         ('Bill Information', {
             'fields': ('student', 'description', 'amount', 'due_date', 'date_incurred', 'late_date')
         }),
-        ('Status', {
-            'fields': ('is_paid', 'show_in_payment_history')
+        ('Payment Status', {
+            'fields': ('is_paid', 'show_in_payment_history', 'remaining_amount_display', 'payment_status_display', 'is_fully_paid_display')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def remaining_amount_display(self, obj):
+        """Display remaining amount with color coding"""
+        if obj.remaining_amount == 0:
+            return f"${obj.remaining_amount:,.2f}"
+        elif obj.remaining_amount < obj.amount:
+            return f"${obj.remaining_amount:,.2f} (Partially Paid)"
+        else:
+            return f"${obj.remaining_amount:,.2f} (Unpaid)"
+    remaining_amount_display.short_description = 'Remaining Amount'
+    remaining_amount_display.admin_order_field = 'amount'
+    
+    def payment_status_display(self, obj):
+        """Display payment status with color coding"""
+        if obj.payment_status == 'Paid':
+            return '🟢 Paid'
+        elif obj.payment_status == 'Partially Paid':
+            return '🟡 Partially Paid'
+        else:
+            return '🔴 Unpaid'
+    payment_status_display.short_description = 'Payment Status'
+    payment_status_display.admin_order_field = 'is_paid'
+    
+    def is_fully_paid_display(self, obj):
+        """Display if bill is fully paid"""
+        return obj.is_fully_paid
+    is_fully_paid_display.boolean = True
+    is_fully_paid_display.short_description = 'Fully Paid'
+    
+    def get_queryset(self, request):
+        """Optimize queryset with select_related and prefetch_related"""
+        return super().get_queryset(request).select_related('student').prefetch_related('payment_items')
 
 
 # Logging Admin Classes

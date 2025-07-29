@@ -441,6 +441,36 @@ class PaymentBreakdown(models.Model, AuditMixin):
             late_date = self.late_date
         return (timezone.now().date() - late_date).days
 
+    @property
+    def remaining_amount(self):
+        """Calculate the remaining amount to be paid on this bill"""
+        from decimal import Decimal
+        # Sum all payments made towards this bill
+        total_paid = self.payment_items.aggregate(
+            total=models.Sum('amount_paid')
+        )['total'] or Decimal('0.00')
+        
+        # Calculate remaining amount
+        remaining = self.amount - total_paid
+        
+        # Ensure remaining amount is not negative
+        return max(remaining, Decimal('0.00'))
+
+    @property
+    def is_fully_paid(self):
+        """Check if the bill is fully paid"""
+        return self.remaining_amount <= Decimal('0.00')
+
+    @property
+    def payment_status(self):
+        """Get the payment status of the bill"""
+        if self.is_fully_paid:
+            return 'Paid'
+        elif self.remaining_amount < self.amount:
+            return 'Partially Paid'
+        else:
+            return 'Unpaid'
+
     def save(self, *args, **kwargs):
         # Ensure date_incurred is always set
         if not self.date_incurred:
