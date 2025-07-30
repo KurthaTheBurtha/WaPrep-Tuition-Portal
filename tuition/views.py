@@ -91,6 +91,12 @@ def logout_view(request):
     clear_messages(request)  # Clear any existing messages
     return redirect('home')
 
+@require_POST
+def ajax_logout(request):
+    """AJAX endpoint for automatic logout due to inactivity"""
+    logout(request)
+    return JsonResponse({'status': 'success', 'message': 'Logged out due to inactivity'})
+
 @login_required
 def payment(request, student_id):
     # Only allow payer users
@@ -2293,7 +2299,7 @@ def ask_question_view(request):
         return redirect('payer_login')
 
     # Get only the logged-in payer's students
-    my_students = Student.objects.filter(StudentPayer__payer=request.user).distinct()
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
     student_choices = [(s.id, f"{s.first_name} {s.last_name} (Balance: ${s.current_balance:.2f} | Due: {s.due_date.strftime('%b %d, %Y') if s.due_date else 'No due date'})") for s in my_students]
 
     if request.method == 'POST':
