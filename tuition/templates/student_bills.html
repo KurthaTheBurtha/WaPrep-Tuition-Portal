@@ -660,6 +660,27 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Prevent typing "-" and "+" in amount input fields
+    function preventSpecialChars(event) {
+        const key = event.key;
+        if (key === '-' || key === '+') {
+            event.preventDefault();
+            return false;
+        }
+    }
+
+    // Add event listeners to amount input fields
+    const amountInput = document.getElementById('amount');
+    const editAmountInput = document.getElementById('edit_amount');
+    
+    if (amountInput) {
+        amountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (editAmountInput) {
+        editAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+
     // Set default due date to today when add bill modal opens
     const addBillModal = document.getElementById('addBillModal');
     if (addBillModal) {

@@ -758,6 +758,21 @@ document.getElementById('stripe-payment-form')?.addEventListener('submit', async
     }
 });
 
+// Prevent typing "-" and "+" in payment amount input field
+function preventSpecialChars(event) {
+    const key = event.key;
+    if (key === '-' || key === '+') {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Add event listener to payment amount input field
+const paymentAmountInput = document.getElementById('payment_amount');
+if (paymentAmountInput) {
+    paymentAmountInput.addEventListener('keydown', preventSpecialChars);
+}
+
 // Payment Amount Selection Functionality
 const overdueItems = {{ overdue_items_json|safe }};
 const currentMonthItems = {{ current_month_items_json|safe }};

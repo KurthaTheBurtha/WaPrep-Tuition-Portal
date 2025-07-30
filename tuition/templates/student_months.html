@@ -198,6 +198,21 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Prevent typing "-" and "+" in amount input fields
+        function preventSpecialChars(event) {
+            const key = event.key;
+            if (key === '-' || key === '+') {
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        // Add event listeners to amount input fields
+        const amountInput = document.getElementById('amount');
+        if (amountInput) {
+            amountInput.addEventListener('keydown', preventSpecialChars);
+        }
+
         // Handle clickable rows
         document.querySelectorAll('.clickable-row').forEach(row => {
             row.addEventListener('click', function(e) {

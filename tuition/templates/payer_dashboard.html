@@ -229,5 +229,30 @@
         </div>
     </div>
 </div>
+
+<!-- Policies Modal -->
+<div class="modal fade" id="policiesModal" tabindex="-1" aria-labelledby="policiesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="policiesModalLabel">
+                    <i class="fas fa-file-contract me-2"></i>WAPrep Policies
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="pdf-container" style="height: 80vh;">
+                    <iframe id="policyPdf" src="{% static 'policies/policy.pdf' %}" width="100%" height="100%" frameborder="0"></iframe>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="{% static 'policies/policy.pdf' %}" class="btn btn-outline-primary" download>
+                    <i class="fas fa-download me-1"></i>Download PDF
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
     
 {% endblock %}

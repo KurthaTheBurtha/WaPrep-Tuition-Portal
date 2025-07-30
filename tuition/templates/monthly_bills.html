@@ -697,6 +697,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Prevent typing "-" and "+" in amount input fields
+    function preventSpecialChars(event) {
+        const key = event.key;
+        if (key === '-' || key === '+') {
+            event.preventDefault();
+            return false;
+        }
+    }
+
+    // Add event listeners to amount input fields
+    const amountInput = document.getElementById('amount');
+    const editAmountInput = document.getElementById('edit_amount');
+    const paymentAmountInput = document.getElementById('payment_amount');
+    
+    if (amountInput) {
+        amountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (editAmountInput) {
+        editAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (paymentAmountInput) {
+        paymentAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+
     // Handle form submission
     const addBillForm = document.getElementById('addBillForm');
     const submitBtn = document.getElementById('submitBillBtn');
