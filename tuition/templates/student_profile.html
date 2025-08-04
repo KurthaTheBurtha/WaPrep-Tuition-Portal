@@ -226,6 +226,12 @@ function toggleNewPayerFields() {
 function editField(fieldName, currentValue) {
     let displayElement, inputElement, saveButton, cancelButton;
     
+    // Find and hide the edit button that was clicked
+    const editButton = event.target.closest('button');
+    if (editButton) {
+        editButton.style.display = 'none';
+    }
+    
     if (fieldName === 'grade') {
         displayElement = document.getElementById('grade-display');
         inputElement = document.createElement('select');
@@ -284,12 +290,12 @@ function editField(fieldName, currentValue) {
     saveButton = document.createElement('button');
     saveButton.className = 'btn btn-sm btn-success ms-2';
     saveButton.innerHTML = '<i class="fas fa-check"></i>';
-    saveButton.onclick = () => saveField(fieldName, inputElement.value, displayElement);
+    saveButton.onclick = () => saveField(fieldName, inputElement.value, displayElement, editButton);
     
     cancelButton = document.createElement('button');
     cancelButton.className = 'btn btn-sm btn-secondary ms-1';
     cancelButton.innerHTML = '<i class="fas fa-times"></i>';
-    cancelButton.onclick = () => cancelEdit(displayElement, currentValue, fieldName);
+    cancelButton.onclick = () => cancelEdit(displayElement, currentValue, fieldName, editButton);
     
     // Replace display with input
     const parent = displayElement.parentNode;
@@ -302,7 +308,7 @@ function editField(fieldName, currentValue) {
     inputElement.focus();
 }
 
-function saveField(fieldName, newValue, displayElement) {
+function saveField(fieldName, newValue, displayElement, editButton) {
     const studentId = {{ student.id }};
     
     fetch('{% url "inline_edit_student_field" %}', {
@@ -337,11 +343,11 @@ function saveField(fieldName, newValue, displayElement) {
         console.error('Error:', error);
     })
     .finally(() => {
-        cancelEdit(displayElement, null, fieldName, true);
+        cancelEdit(displayElement, null, fieldName, true, editButton);
     });
 }
 
-function cancelEdit(displayElement, originalValue, fieldName, skipRestore = false) {
+function cancelEdit(displayElement, originalValue, fieldName, skipRestore = false, editButton = null) {
     const parent = displayElement.parentNode;
     const input = parent.querySelector('select, textarea, input');
     const saveBtn = parent.querySelector('.btn-success');
@@ -352,6 +358,11 @@ function cancelEdit(displayElement, originalValue, fieldName, skipRestore = fals
     if (cancelBtn) cancelBtn.remove();
     
     displayElement.style.display = '';
+    
+    // Show the edit button again
+    if (editButton) {
+        editButton.style.display = '';
+    }
     
     if (!skipRestore && originalValue !== null) {
         if (fieldName === 'status') {
@@ -395,6 +406,12 @@ function editName(firstName, lastName) {
     const displayElement = document.getElementById('name-display');
     const parent = displayElement.parentNode;
     
+    // Find and hide the edit button that was clicked
+    const editButton = event.target.closest('button');
+    if (editButton) {
+        editButton.style.display = 'none';
+    }
+    
     // Create input fields
     const firstInput = document.createElement('input');
     firstInput.type = 'text';
@@ -417,14 +434,14 @@ function editName(firstName, lastName) {
     saveBtn.className = 'btn btn-sm btn-success ms-2';
     saveBtn.innerHTML = '<i class="fas fa-check"></i>';
     saveBtn.onclick = function() {
-        saveName(firstInput.value, lastInput.value, displayElement);
+        saveName(firstInput.value, lastInput.value, displayElement, editButton);
     };
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditName(displayElement, firstName, lastName);
+        cancelEditName(displayElement, firstName, lastName, editButton);
     };
     
     // Insert inputs and buttons
@@ -436,7 +453,7 @@ function editName(firstName, lastName) {
     firstInput.focus();
 }
 
-function saveName(newFirst, newLast, displayElement) {
+function saveName(newFirst, newLast, displayElement, editButton) {
     const studentId = {{ student.id }};
     fetch('{% url "inline_edit_student_field" %}', {
         method: 'POST',
@@ -476,11 +493,11 @@ function saveName(newFirst, newLast, displayElement) {
         console.error('Error:', error);
     })
     .finally(() => {
-        cancelEditName(displayElement, newFirst, newLast, true);
+        cancelEditName(displayElement, newFirst, newLast, true, editButton);
     });
 }
 
-function cancelEditName(displayElement, firstName, lastName, skipRestore = false) {
+function cancelEditName(displayElement, firstName, lastName, skipRestore = false, editButton = null) {
     const parent = displayElement.parentNode;
     const firstInput = parent.querySelector('#edit-first-name');
     const lastInput = parent.querySelector('#edit-last-name');
@@ -491,6 +508,12 @@ function cancelEditName(displayElement, firstName, lastName, skipRestore = false
     if (saveBtn) saveBtn.remove();
     if (cancelBtn) cancelBtn.remove();
     displayElement.style.display = '';
+    
+    // Show the edit button again
+    if (editButton) {
+        editButton.style.display = '';
+    }
+    
     if (!skipRestore) {
         displayElement.textContent = `${firstName} ${lastName}`;
     }
@@ -500,6 +523,12 @@ function cancelEditName(displayElement, firstName, lastName, skipRestore = false
 function editPayerName(studentPayerId, firstName, lastName) {
     const displayElement = document.getElementById(`payer-name-${studentPayerId}`);
     const parent = displayElement.parentNode;
+    
+    // Find and hide the edit button that was clicked
+    const editButton = event.target.closest('button');
+    if (editButton) {
+        editButton.style.display = 'none';
+    }
     
     // Create input fields
     const firstInput = document.createElement('input');
@@ -523,14 +552,14 @@ function editPayerName(studentPayerId, firstName, lastName) {
     saveBtn.className = 'btn btn-sm btn-success ms-2';
     saveBtn.innerHTML = '<i class="fas fa-check"></i>';
     saveBtn.onclick = function() {
-        savePayerName(studentPayerId, firstInput.value, lastInput.value, displayElement);
+        savePayerName(studentPayerId, firstInput.value, lastInput.value, displayElement, editButton);
     };
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerName(displayElement, firstName, lastName);
+        cancelEditPayerName(displayElement, firstName, lastName, editButton);
     };
     
     // Insert inputs and buttons
@@ -542,7 +571,7 @@ function editPayerName(studentPayerId, firstName, lastName) {
     firstInput.focus();
 }
 
-function savePayerName(studentPayerId, newFirst, newLast, displayElement) {
+function savePayerName(studentPayerId, newFirst, newLast, displayElement, editButton) {
     fetch('{% url "inline_edit_payer_field" %}', {
         method: 'POST',
         headers: {
@@ -581,11 +610,11 @@ function savePayerName(studentPayerId, newFirst, newLast, displayElement) {
         console.error('Error:', error);
     })
     .finally(() => {
-        cancelEditPayerName(displayElement, newFirst, newLast, true);
+        cancelEditPayerName(displayElement, newFirst, newLast, true, editButton);
     });
 }
 
-function cancelEditPayerName(displayElement, firstName, lastName, skipRestore = false) {
+function cancelEditPayerName(displayElement, firstName, lastName, skipRestore = false, editButton = null) {
     const parent = displayElement.parentNode;
     const firstInput = parent.querySelector('input[id^="edit-payer-first-"]');
     const lastInput = parent.querySelector('input[id^="edit-payer-last-"]');
@@ -596,6 +625,12 @@ function cancelEditPayerName(displayElement, firstName, lastName, skipRestore = 
     if (saveBtn) saveBtn.remove();
     if (cancelBtn) cancelBtn.remove();
     displayElement.style.display = '';
+    
+    // Show the edit button again
+    if (editButton) {
+        editButton.style.display = '';
+    }
+    
     if (!skipRestore) {
         displayElement.textContent = `${firstName} ${lastName}`;
     }
@@ -604,6 +639,12 @@ function cancelEditPayerName(displayElement, firstName, lastName, skipRestore = 
 function editPayerRelationship(studentPayerId, relationship) {
     const displayElement = document.getElementById(`payer-relationship-${studentPayerId}`);
     const parent = displayElement.parentNode;
+    
+    // Find and hide the edit button that was clicked
+    const editButton = event.target.closest('button');
+    if (editButton) {
+        editButton.style.display = 'none';
+    }
     
     // Create relationship select
     const relationshipSelect = document.createElement('select');
@@ -631,14 +672,14 @@ function editPayerRelationship(studentPayerId, relationship) {
     saveBtn.className = 'btn btn-sm btn-success ms-2';
     saveBtn.innerHTML = '<i class="fas fa-check"></i>';
     saveBtn.onclick = function() {
-        savePayerRelationship(studentPayerId, relationshipSelect.value, displayElement);
+        savePayerRelationship(studentPayerId, relationshipSelect.value, displayElement, editButton);
     };
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerRelationship(displayElement, relationship);
+        cancelEditPayerRelationship(displayElement, relationship, editButton);
     };
     
     // Insert elements
@@ -649,7 +690,7 @@ function editPayerRelationship(studentPayerId, relationship) {
     relationshipSelect.focus();
 }
 
-function savePayerRelationship(studentPayerId, relationship, displayElement) {
+function savePayerRelationship(studentPayerId, relationship, displayElement, editButton) {
     fetch('{% url "inline_edit_payer_field" %}', {
         method: 'POST',
         headers: {
@@ -672,11 +713,11 @@ function savePayerRelationship(studentPayerId, relationship, displayElement) {
         console.error('Error:', error);
     })
     .finally(() => {
-        cancelEditPayerRelationship(displayElement, relationship, true);
+        cancelEditPayerRelationship(displayElement, relationship, true, editButton);
     });
 }
 
-function cancelEditPayerRelationship(displayElement, relationship, skipRestore = false) {
+function cancelEditPayerRelationship(displayElement, relationship, skipRestore = false, editButton = null) {
     const parent = displayElement.parentNode;
     const select = parent.querySelector('select[id^="edit-payer-relationship-"]');
     const saveBtn = parent.querySelector('.btn-success');
@@ -687,6 +728,12 @@ function cancelEditPayerRelationship(displayElement, relationship, skipRestore =
     if (cancelBtn) cancelBtn.remove();
     
     displayElement.style.display = '';
+    
+    // Show the edit button again
+    if (editButton) {
+        editButton.style.display = '';
+    }
+    
     if (!skipRestore) {
         const relationshipText = select ? select.options[select.selectedIndex].text : relationship;
         displayElement.innerHTML = relationshipText;
@@ -696,6 +743,12 @@ function cancelEditPayerRelationship(displayElement, relationship, skipRestore =
 function editPayerEmail(studentPayerId, email) {
     const displayElement = document.getElementById(`payer-email-${studentPayerId}`);
     const parent = displayElement.parentNode;
+    
+    // Find and hide the edit button that was clicked
+    const editButton = event.target.closest('button');
+    if (editButton) {
+        editButton.style.display = 'none';
+    }
     
     // Create input field
     const input = document.createElement('input');
@@ -711,14 +764,14 @@ function editPayerEmail(studentPayerId, email) {
     saveBtn.className = 'btn btn-sm btn-success ms-2';
     saveBtn.innerHTML = '<i class="fas fa-check"></i>';
     saveBtn.onclick = function() {
-        savePayerEmail(studentPayerId, input.value, displayElement);
+        savePayerEmail(studentPayerId, input.value, displayElement, editButton);
     };
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerEmail(displayElement, email);
+        cancelEditPayerEmail(displayElement, email, editButton);
     };
     
     // Insert elements
@@ -729,7 +782,7 @@ function editPayerEmail(studentPayerId, email) {
     input.focus();
 }
 
-function savePayerEmail(studentPayerId, email, displayElement) {
+function savePayerEmail(studentPayerId, email, displayElement, editButton) {
     fetch('{% url "inline_edit_payer_field" %}', {
         method: 'POST',
         headers: {
@@ -752,11 +805,11 @@ function savePayerEmail(studentPayerId, email, displayElement) {
         console.error('Error:', error);
     })
     .finally(() => {
-        cancelEditPayerEmail(displayElement, email, true);
+        cancelEditPayerEmail(displayElement, email, true, editButton);
     });
 }
 
-function cancelEditPayerEmail(displayElement, email, skipRestore = false) {
+function cancelEditPayerEmail(displayElement, email, skipRestore = false, editButton = null) {
     const parent = displayElement.parentNode;
     const input = parent.querySelector('input[id^="edit-payer-email-"]');
     const saveBtn = parent.querySelector('.btn-success');
@@ -767,6 +820,12 @@ function cancelEditPayerEmail(displayElement, email, skipRestore = false) {
     if (cancelBtn) cancelBtn.remove();
     
     displayElement.style.display = '';
+    
+    // Show the edit button again
+    if (editButton) {
+        editButton.style.display = '';
+    }
+    
     if (!skipRestore) {
         displayElement.textContent = email;
     }

@@ -309,14 +309,23 @@
             document.body.classList.remove('modal-open');
             document.body.style = ''; // Clear overflow and other inline styles
             
-            // Auto-dismiss messages after 5 seconds
+            // Auto-dismiss messages after 5 seconds, but keep password validation errors longer
             const messages = document.querySelectorAll('.alert');
             messages.forEach(function(message) {
+                const messageText = message.textContent || message.innerText;
+                const isPasswordError = messageText.includes('Password validation failed:') || 
+                                       messageText.includes('Password must contain') ||
+                                       messageText.includes('Password cannot contain') ||
+                                       messageText.includes('You cannot reuse');
+                
+                // Keep password validation errors for 15 seconds, others for 5 seconds
+                const dismissTime = isPasswordError ? 15000 : 5000;
+                
                 setTimeout(function() {
                     if (message && message.parentNode) {
                         message.remove();
                     }
-                }, 5000);
+                }, dismissTime);
             });
         });
     </script>

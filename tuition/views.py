@@ -1009,7 +1009,6 @@ def students(request):
         students = students.filter(
             models.Q(first_name__icontains=search_query) |
             models.Q(last_name__icontains=search_query) |
-            models.Q(student_id__icontains=search_query) |
             models.Q(grade__icontains=search_query)
         )
     
@@ -1082,11 +1081,10 @@ def add_student(request):
         try:
             birthday_date = datetime.strptime(birthday, '%Y-%m-%d')
             student_id = generate_student_id(first_name, last_name, birthday_date)
-        except:
+        except ValueError:
             messages.error(request, 'Invalid birthday format')
             return redirect('students')
 
-        try:
             # Check for existing student with same name and birth date
             existing_student = Student.objects.filter(
                 first_name__iexact=first_name,
@@ -1098,13 +1096,19 @@ def add_student(request):
                 messages.warning(request, f'A student named {first_name} {last_name} with birth date {birthday_date.strftime("%m/%d/%Y")} already exists (ID: {existing_student.student_id}).')
                 return redirect('students')
 
+            # Convert grade to integer
+            try:
+                grade_int = int(grade) if grade else 1
+            except (ValueError, TypeError):
+                grade_int = 1
+                
             # Create student
             student = Student.objects.create(
                 student_id=student_id,
                 first_name=first_name,
                 last_name=last_name,
                 date_of_birth=birthday_date,
-                grade=grade,
+                grade=grade_int,
             )
 
             # Add payer relationship
@@ -1770,8 +1774,15 @@ def inline_edit_student_field(request):
             if field_name not in allowed_fields:
                 return JsonResponse({'error': 'Invalid field'}, status=400)
             
-            # Set the field value
-            setattr(student, field_name, field_value)
+            # Set the field value with validation for grade
+            if field_name == 'grade':
+                try:
+                    grade_int = int(field_value) if field_value else 1
+                    setattr(student, field_name, grade_int)
+                except (ValueError, TypeError):
+                    return JsonResponse({'error': 'Grade must be a valid number'}, status=400)
+            else:
+                setattr(student, field_name, field_value)
             student.save()
             
             # Return the formatted value for display
