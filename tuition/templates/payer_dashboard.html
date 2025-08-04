@@ -243,5 +243,39 @@
         </div>
     </div>
 </div>
+
+<!-- Policies Modal -->
+<div class="modal fade" id="policiesModal" tabindex="-1" aria-labelledby="policiesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="policiesModalLabel">
+                    <i class="fas fa-file-contract me-2"></i>WAPrep Policies
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="pdf-container" style="height: 80vh;">
+                    <embed id="policyPdf" src="{% static 'policies/waprep-policies.pdf' %}#toolbar=1&navpanes=1&scrollbar=1" 
+                           type="application/pdf" width="100%" height="100%">
+                    <div class="text-center p-4">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>PDF Viewer Not Available</strong><br>
+                            Your browser doesn't support inline PDF viewing. Please use the download button below to view the policies.
+                        </div>
+                    </div>
+                    </embed>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="{% static 'policies/waprep-policies.pdf' %}" class="btn btn-outline-primary" download>
+                    <i class="fas fa-download me-1"></i>Download PDF
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
     
 {% endblock %}
