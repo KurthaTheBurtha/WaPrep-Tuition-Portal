@@ -32,7 +32,7 @@ echo "Checking migration status..."
 python manage.py showmigrations
 
 echo "Creating default admin user if it doesn't exist..."
-python manage.py create_admin --first_name "Admin" --last_name "User" --email "admin@waprep.org" --password "Admin123!@#" || echo "Admin user already exists or error occurred"
+python manage.py create_admin || echo "Admin user creation completed with warnings"
 
 echo "Verifying WSGI application..."
 python -c "from tuition.wsgi import application; print('WSGI application loaded successfully')"
