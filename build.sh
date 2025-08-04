@@ -19,7 +19,7 @@ echo "Collecting static files..."
 python manage.py collectstatic --no-input
 
 echo "Setting Django settings module..."
-export DJANGO_SETTINGS_MODULE=tuition.settings_production
+export DJANGO_SETTINGS_MODULE=tuition.settings_staging
 echo "DJANGO_SETTINGS_MODULE set to: $DJANGO_SETTINGS_MODULE"
 
 echo "Checking database connection..."

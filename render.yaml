@@ -3,8 +3,8 @@ services:
     name: waprep-tuition-portal
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: chmod +x start.sh && ./start.sh
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: gunicorn tuition.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
