@@ -254,28 +254,102 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-0">
-                <div class="pdf-container" style="height: 80vh;">
-                    <embed id="policyPdf" src="{% static 'policies/waprep-policies.pdf' %}#toolbar=1&navpanes=1&scrollbar=1" 
-                           type="application/pdf" width="100%" height="100%">
-                    <div class="text-center p-4">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>PDF Viewer Not Available</strong><br>
-                            Your browser doesn't support inline PDF viewing. Please use the download button below to view the policies.
-                        </div>
-                    </div>
-                    </embed>
+            <div class="modal-body p-2">
+                <div class="image-container" style="max-height: 80vh; overflow-y: auto;">
+                    <img id="policyImage" 
+                         src="{% static 'policies/waprep-policies.jpg' %}" 
+                         alt="WAPrep Policies" 
+                         class="img-fluid w-100 h-auto"
+                         style="box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px;">
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="{% static 'policies/waprep-policies.pdf' %}" class="btn btn-outline-primary" download>
-                    <i class="fas fa-download me-1"></i>Download PDF
+                <a href="{% static 'policies/waprep-policies.jpg' %}" class="btn btn-outline-primary" download="waprep-policies.jpg">
+                    <i class="fas fa-download me-1"></i>Download Image
+                </a>
+                <a href="{% static 'policies/waprep-policies.jpg' %}" class="btn btn-outline-secondary" target="_blank">
+                    <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
                 </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
+<!-- Policies Modal Styles -->
+<style>
+.image-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.image-container img {
+    transition: transform 0.2s ease;
+    cursor: zoom-in;
+}
+
+.image-container img:hover {
+    transform: scale(1.02);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .image-container {
+        max-height: 70vh !important;
+        padding: 5px;
+    }
+    
+    #policiesModal .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    #policiesModal .modal-body {
+        padding: 0.5rem !important;
+    }
+}
+
+/* Fullscreen image on click */
+.image-container img[data-fullscreen="true"] {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    z-index: 9999;
+    background: rgba(0,0,0,0.9);
+    object-fit: contain;
+    cursor: zoom-out;
+}
+</style>
+
+<!-- Image Click Handler -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const policyImage = document.getElementById('policyImage');
+    if (policyImage) {
+        policyImage.addEventListener('click', function() {
+            if (this.getAttribute('data-fullscreen') === 'true') {
+                // Exit fullscreen
+                this.setAttribute('data-fullscreen', 'false');
+                this.style.cursor = 'zoom-in';
+            } else {
+                // Enter fullscreen
+                this.setAttribute('data-fullscreen', 'true');
+                this.style.cursor = 'zoom-out';
+            }
+        });
+        
+        // Exit fullscreen on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && policyImage.getAttribute('data-fullscreen') === 'true') {
+                policyImage.setAttribute('data-fullscreen', 'false');
+                policyImage.style.cursor = 'zoom-in';
+            }
+        });
+    }
+});
+</script>
     
 {% endblock %}

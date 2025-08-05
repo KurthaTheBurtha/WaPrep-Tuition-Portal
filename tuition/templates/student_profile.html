@@ -38,7 +38,7 @@
                         <div class="col-md-6">
                             <div class="d-flex align-items-center mb-3">
                                 <p class="mb-0 me-2"><strong>Grade:</strong></p>
-                                <span id="grade-display">Grade {{ student.grade }}</span>
+                                <span id="grade-display">{{ student.grade }}</span>
                                 <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="editField('grade', '{{ student.grade }}')" title="Edit grade">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -242,7 +242,7 @@ function editField(fieldName, currentValue) {
         grades.forEach(grade => {
             const option = document.createElement('option');
             option.value = grade;
-            option.textContent = `Grade ${grade}`;
+            option.textContent = grade;
             if (grade === currentValue) option.selected = true;
             inputElement.appendChild(option);
         });
@@ -295,7 +295,7 @@ function editField(fieldName, currentValue) {
     cancelButton = document.createElement('button');
     cancelButton.className = 'btn btn-sm btn-secondary ms-1';
     cancelButton.innerHTML = '<i class="fas fa-times"></i>';
-    cancelButton.onclick = () => cancelEdit(displayElement, currentValue, fieldName, editButton);
+    cancelButton.onclick = () => cancelEdit(displayElement, currentValue, fieldName, false, editButton);
     
     // Replace display with input
     const parent = displayElement.parentNode;
@@ -441,7 +441,7 @@ function editName(firstName, lastName) {
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditName(displayElement, firstName, lastName, editButton);
+        cancelEditName(displayElement, firstName, lastName, false, editButton);
     };
     
     // Insert inputs and buttons
@@ -559,7 +559,7 @@ function editPayerName(studentPayerId, firstName, lastName) {
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerName(displayElement, firstName, lastName, editButton);
+        cancelEditPayerName(displayElement, firstName, lastName, false, editButton);
     };
     
     // Insert inputs and buttons
@@ -679,7 +679,7 @@ function editPayerRelationship(studentPayerId, relationship) {
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerRelationship(displayElement, relationship, editButton);
+        cancelEditPayerRelationship(displayElement, relationship, false, editButton);
     };
     
     // Insert elements
@@ -771,7 +771,7 @@ function editPayerEmail(studentPayerId, email) {
     cancelBtn.className = 'btn btn-sm btn-secondary ms-1';
     cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
     cancelBtn.onclick = function() {
-        cancelEditPayerEmail(displayElement, email, editButton);
+        cancelEditPayerEmail(displayElement, email, false, editButton);
     };
     
     // Insert elements
