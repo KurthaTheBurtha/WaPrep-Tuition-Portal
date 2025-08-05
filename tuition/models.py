@@ -241,7 +241,7 @@ class Student(models.Model, StudentAuditMixin):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
-    grade = models.CharField(max_length=20)
+    grade = models.IntegerField(help_text="Student's grade level (e.g., 1, 2, 3, etc.)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     notes = models.TextField(blank=True, help_text="admin's notes about the student")
     payers = models.ManyToManyField(User, through='StudentPayer', related_name='students')

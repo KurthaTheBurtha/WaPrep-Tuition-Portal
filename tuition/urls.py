@@ -11,6 +11,7 @@ urlpatterns = [
     path('login/payer/', views.payer_login, name='payer_login'),
     path('login/admin/', views.admin_login, name='admin_login'),
     path('logout/', views.logout_view, name='logout'),
+    path('ajax-logout/', views.ajax_logout, name='ajax_logout'),
     path('forgot-password/', views.forgot_password, name='forgot_password'),
     path('forgot-id/', views.forgot_id, name='forgot_id'),
     path('reset-password/<str:token>/', views.reset_password, name='reset_password'),

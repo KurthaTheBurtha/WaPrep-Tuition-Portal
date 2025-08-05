@@ -54,40 +54,42 @@ def validate_password(password: str, user=None) -> Tuple[bool, str]:
     - No keyboard patterns (e.g., 'qwerty', '123456')
     - Not recently used by the same user (if user is provided)
     """
+    errors = []
+    
     if not password:
         return False, "Password is required"
     
     # Check minimum length
     if len(password) < 8:
-        return False, "Password must be at least 8 characters long"
+        errors.append("Password must be at least 8 characters long")
     
     # Check maximum length (reasonable limit)
     if len(password) > 128:
-        return False, "Password is too long (maximum 128 characters)"
+        errors.append("Password is too long (maximum 128 characters)")
     
     # Check for uppercase letter
     if not re.search(r'[A-Z]', password):
-        return False, "Password must contain at least one uppercase letter"
+        errors.append("Password must contain at least one uppercase letter")
     
     # Check for lowercase letter
     if not re.search(r'[a-z]', password):
-        return False, "Password must contain at least one lowercase letter"
+        errors.append("Password must contain at least one lowercase letter")
     
     # Check for number
     if not re.search(r'\d', password):
-        return False, "Password must contain at least one number"
+        errors.append("Password must contain at least one number")
     
     # Check for special character
     if not re.search(r'[!@#$%^&*]', password):
-        return False, "Password must contain at least one special character (!@#$%^&*)"
+        errors.append("Password must contain at least one special character (!@#$%^&*)")
     
     # Check for common passwords
     if password.lower() in COMMON_PASSWORDS:
-        return False, "This password is too common. Please choose a more unique password"
+        errors.append("This password is too common. Please choose a more unique password")
     
     # Check for consecutive repeating characters (more than 2)
     if re.search(r'(.)\1{2,}', password):
-        return False, "Password cannot contain more than 2 consecutive identical characters"
+        errors.append("Password cannot contain more than 2 consecutive identical characters")
     
     # Check for keyboard patterns
     keyboard_patterns = [
@@ -97,7 +99,8 @@ def validate_password(password: str, user=None) -> Tuple[bool, str]:
     password_lower = password.lower()
     for pattern in keyboard_patterns:
         if pattern in password_lower:
-            return False, "Password cannot contain keyboard patterns"
+            errors.append("Password cannot contain keyboard patterns")
+            break
     
     # Check for personal information patterns (basic check)
     personal_patterns = [
@@ -107,17 +110,23 @@ def validate_password(password: str, user=None) -> Tuple[bool, str]:
     ]
     for pattern in personal_patterns:
         if re.search(pattern, password_lower):
-            return False, "Password contains common insecure patterns"
+            errors.append("Password contains common insecure patterns")
+            break
     
     # Check if password has been used recently by this user
     if user:
         try:
             from .models import PasswordHistory
             if PasswordHistory.is_password_reused(user, password):
-                return False, "You cannot reuse any of your last 5 passwords. Please choose a different password."
+                errors.append("You cannot reuse any of your last 5 passwords. Please choose a different password.")
         except ImportError:
             # If PasswordHistory model is not available (e.g., during migrations), skip this check
             pass
+    
+    if errors:
+        # Return all errors as a bulleted list with HTML formatting
+        error_message = "Password validation failed:<br>• " + "<br>• ".join(errors)
+        return False, error_message
     
     return True, "Password meets all security requirements"
 

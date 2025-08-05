@@ -91,6 +91,12 @@ def logout_view(request):
     clear_messages(request)  # Clear any existing messages
     return redirect('home')
 
+@require_POST
+def ajax_logout(request):
+    """AJAX endpoint for automatic logout due to inactivity"""
+    logout(request)
+    return JsonResponse({'status': 'success', 'message': 'Logged out due to inactivity'})
+
 @login_required
 def payment(request, student_id):
     # Only allow payer users
@@ -683,17 +689,31 @@ def payment_history(request):
     ).order_by('-payment_date')
     
     # Get bills that are marked as paid and should show in payment history
+    # But exclude bills that are already covered by Payment records (to avoid duplicates)
     paid_bills = PaymentBreakdown.objects.filter(
         student__in=my_students,
         is_paid=True,
-        show_in_payment_history=True
+        show_in_payment_history=True,
+        payment_items__isnull=True  # Only bills that aren't part of a Payment record
     ).order_by('-updated_at')  # Use updated_at as the "payment date" for bills
     
     # Create a combined list of payments and bills for display
     all_transactions = []
     
-    # Add regular payments
+    # Add regular payments with breakdown details
     for payment in payments:
+        # Get the bills covered by this payment
+        payment_items = payment.payment_items.all().select_related('breakdown_item')
+        bills_covered = [item.breakdown_item for item in payment_items]
+        
+        # Create description with bill details
+        if bills_covered:
+            bill_descriptions = [f"{bill.description} (${item.amount_paid})" 
+                               for item, bill in zip(payment_items, bills_covered)]
+            description = f"Payment for {payment.student.first_name} {payment.student.last_name}: " + ", ".join(bill_descriptions)
+        else:
+            description = f'Payment - {payment.student.first_name} {payment.student.last_name}'
+        
         all_transactions.append({
             'type': 'payment',
             'object': payment,
@@ -701,11 +721,13 @@ def payment_history(request):
             'amount': payment.amount,
             'student': payment.student,
             'status': payment.status,
-            'description': f'Payment - {payment.student.first_name} {payment.student.last_name}',
+            'description': description,
             'receipt_number': payment.receipt_number,
+            'bills_covered': bills_covered,
+            'payment_items': payment_items,
         })
     
-    # Add paid bills that should show in history
+    # Add paid bills that should show in history (only standalone bills, not part of payments)
     for bill in paid_bills:
         all_transactions.append({
             'type': 'bill',
@@ -1003,7 +1025,6 @@ def students(request):
         students = students.filter(
             models.Q(first_name__icontains=search_query) |
             models.Q(last_name__icontains=search_query) |
-            models.Q(student_id__icontains=search_query) |
             models.Q(grade__icontains=search_query)
         )
     
@@ -1076,29 +1097,35 @@ def add_student(request):
         try:
             birthday_date = datetime.strptime(birthday, '%Y-%m-%d')
             student_id = generate_student_id(first_name, last_name, birthday_date)
-        except:
+        except ValueError:
             messages.error(request, 'Invalid birthday format')
             return redirect('students')
 
-        try:
-            # Check for existing student with same name and birth date
-            existing_student = Student.objects.filter(
-                first_name__iexact=first_name,
-                last_name__iexact=last_name,
-                date_of_birth=birthday_date
-            ).first()
-            
-            if existing_student:
-                messages.warning(request, f'A student named {first_name} {last_name} with birth date {birthday_date.strftime("%m/%d/%Y")} already exists (ID: {existing_student.student_id}).')
-                return redirect('students')
+        # Check for existing student with same name and birth date
+        existing_student = Student.objects.filter(
+            first_name__iexact=first_name,
+            last_name__iexact=last_name,
+            date_of_birth=birthday_date
+        ).first()
+        
+        if existing_student:
+            messages.warning(request, f'A student named {first_name} {last_name} with birth date {birthday_date.strftime("%m/%d/%Y")} already exists (ID: {existing_student.student_id}).')
+            return redirect('students')
 
-            # Create student
+        # Convert grade to integer
+        try:
+            grade_int = int(grade) if grade else 1
+        except (ValueError, TypeError):
+            grade_int = 1
+            
+        # Create student
+        try:
             student = Student.objects.create(
                 student_id=student_id,
                 first_name=first_name,
                 last_name=last_name,
                 date_of_birth=birthday_date,
-                grade=grade,
+                grade=grade_int,
             )
 
             # Add payer relationship
@@ -1764,8 +1791,15 @@ def inline_edit_student_field(request):
             if field_name not in allowed_fields:
                 return JsonResponse({'error': 'Invalid field'}, status=400)
             
-            # Set the field value
-            setattr(student, field_name, field_value)
+            # Set the field value with validation for grade
+            if field_name == 'grade':
+                try:
+                    grade_int = int(field_value) if field_value else 1
+                    setattr(student, field_name, grade_int)
+                except (ValueError, TypeError):
+                    return JsonResponse({'error': 'Grade must be a valid number'}, status=400)
+            else:
+                setattr(student, field_name, field_value)
             student.save()
             
             # Return the formatted value for display
@@ -2293,7 +2327,7 @@ def ask_question_view(request):
         return redirect('payer_login')
 
     # Get only the logged-in payer's students
-    my_students = Student.objects.filter(StudentPayer__payer=request.user).distinct()
+    my_students = Student.objects.filter(studentpayer__payer=request.user).distinct()
     student_choices = [(s.id, f"{s.first_name} {s.last_name} (Balance: ${s.current_balance:.2f} | Due: {s.due_date.strftime('%b %d, %Y') if s.due_date else 'No due date'})") for s in my_students]
 
     if request.method == 'POST':
