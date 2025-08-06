@@ -24,17 +24,23 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="row mb-3">
-                        <div class="col-2"><h4 class="mb-4">My Students</h4></div>
-                        <div class="col-1"></div>
-                        <div class="col-2"></div>
-                        <div class="col-2 text-center">
-                            <span style="background-color: #dc3545; color: white; padding: 8px 16px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">OVERDUE</span>
+                        <div class="col-12 col-md-2"><h4 class="mb-4">My Students</h4></div>
+                        <div class="col-12 col-md-1"></div>
+                        <div class="col-12 col-md-2"></div>
+                        <div class="col-6 col-md-2 text-center">
+                            <span class="text-nowrap" style="background-color: #dc3545; color: white; padding: 8px 16px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">
+                                <span class="d-none d-md-inline">OVERDUE</span>
+                                <span class="d-inline d-md-none">DUE</span>
+                            </span>
                         </div>
-                        <div class="col-2"></div>
-                        <div class="col-1 text-center">
-                            <span style="background-color: #198754; color: white; padding: 8px 16px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">UPCOMING</span>
+                        <div class="col-12 col-md-2"></div>
+                        <div class="col-6 col-md-1 text-center">
+                            <span class="text-nowrap" style="background-color: #198754; color: white; padding: 8px 16px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">
+                                <span class="d-none d-md-inline">UPCOMING</span>
+                                <span class="d-inline d-md-none">NEXT</span>
+                            </span>
                         </div>
-                        <div class="col-2"></div>
+                        <div class="col-12 col-md-2"></div>
                         <!-- <div class="col-2 text-center">
                             <span style="background-color: #007bff; color: white; padding: 8px 16px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">FUTURE</span>
                         </div> -->
@@ -102,7 +108,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if student.next_due_date %}
+                                        {% if student.upcoming_amount > 0 and student.next_due_date %}
                                             {{ student.next_due_date|date:"M d, Y" }}
                                         {% else %}
                                             <span class="text-muted">No due date</span>
