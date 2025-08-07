@@ -59,21 +59,6 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-file-invoice-dollar text-primary fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Total Bills</h6>
-                            <h2 class="card-title mb-0">{{ total_bills }}</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
                         <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
                             <i class="fas fa-check-circle text-success fa-2x"></i>
                         </div>
@@ -115,6 +100,21 @@
                 </div>
             </div>
         </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-file-invoice-dollar text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Bills</h6>
+                            <h2 class="card-title mb-0">{{ total_bills }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Add Bill Button -->
@@ -147,7 +147,8 @@
                                     <tr>
                                         <th class="border-0 ps-4">Description</th>
                                         <th class="border-0">Date Incurred</th>
-                                        <th class="border-0">Amount</th>
+                                        <th class="border-0">Amount Incurred</th>
+                                        <th class="border-0">Unpaid Amount</th>
                                         <th class="border-0">Due Date</th>
                                         <th class="border-0">Late Date</th>
                                         <th class="border-0 text-center">Status</th>
@@ -169,15 +170,26 @@
                                         <td class="ps-4">{{ bill.description }}</td>
                                         <td>{{ bill.date_incurred|date:"M d, Y" }}</td>
                                         <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>
+                                            {% if bill.remaining_amount == 0 %}
+                                                <span class="text-success">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% elif bill.remaining_amount < bill.amount %}
+                                                <span class="text-warning">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-danger">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ bill.due_date|date:"M d, Y" }}</td>
                                         <td>{{ bill.late_date|date:"M d, Y" }}</td>
                                         <td class="text-center">
-                                            {% if bill.is_paid %}
+                                            {% if bill.payment_status == 'Paid' %}
                                                 <span class="badge bg-success">Paid</span>
+                                            {% elif bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning">Partially Paid</span>
                                             {% elif bill.is_overdue %}
                                                 <span class="badge bg-danger">Overdue</span>
                                             {% else %}
-                                                <span class="badge bg-warning">Unpaid</span>
+                                                <span class="badge bg-danger">Unpaid</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-end pe-4">
@@ -409,7 +421,7 @@
                             <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01" required 
                                    placeholder="0.00">
                         </div>
-                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                        <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
@@ -470,7 +482,7 @@
                             <input type="number" name="amount" id="edit_amount" class="form-control" step="0.01" min="0" required 
                                    placeholder="0.00">
                         </div>
-                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                        <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="edit_due_date" class="form-label">Due Date</label>
@@ -685,6 +697,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Prevent typing "-" and "+" in amount input fields
+    function preventSpecialChars(event) {
+        const key = event.key;
+        if (key === '-' || key === '+') {
+            event.preventDefault();
+            return false;
+        }
+    }
+
+    // Add event listeners to amount input fields
+    const amountInput = document.getElementById('amount');
+    const editAmountInput = document.getElementById('edit_amount');
+    const paymentAmountInput = document.getElementById('payment_amount');
+    
+    if (amountInput) {
+        amountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (editAmountInput) {
+        editAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (paymentAmountInput) {
+        paymentAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+
     // Handle form submission
     const addBillForm = document.getElementById('addBillForm');
     const submitBtn = document.getElementById('submitBillBtn');

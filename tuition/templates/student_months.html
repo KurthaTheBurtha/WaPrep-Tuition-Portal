@@ -53,21 +53,6 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-calendar-alt text-primary fa-2x"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-subtitle mb-1 text-muted">Total Months</h6>
-                            <h2 class="card-title mb-0">{{ monthly_billing|length }}</h2>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
                         <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
                             <i class="fas fa-check-circle text-success fa-2x"></i>
                         </div>
@@ -83,12 +68,12 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
-                            <i class="fas fa-exclamation-triangle text-warning fa-2x"></i>
+                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-exclamation-triangle text-danger fa-2x"></i>
                         </div>
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Unpaid Amount</h6>
-                            <h2 class="card-title mb-0">${{ unpaid_amount|floatformat:2 }}</h2>
+                            <h2 class="card-title mb-0 text-danger">${{ unpaid_amount|floatformat:2 }}</h2>
                         </div>
                     </div>
                 </div>
@@ -104,6 +89,21 @@
                         <div>
                             <h6 class="card-subtitle mb-1 text-muted">Total Amount</h6>
                             <h2 class="card-title mb-0">${{ total_amount|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="fas fa-file-invoice text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Bills</h6>
+                            <h2 class="card-title mb-0">{{ total_bills }}</h2>
                         </div>
                     </div>
                 </div>
@@ -198,6 +198,21 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Prevent typing "-" and "+" in amount input fields
+        function preventSpecialChars(event) {
+            const key = event.key;
+            if (key === '-' || key === '+') {
+                event.preventDefault();
+                return false;
+            }
+        }
+
+        // Add event listeners to amount input fields
+        const amountInput = document.getElementById('amount');
+        if (amountInput) {
+            amountInput.addEventListener('keydown', preventSpecialChars);
+        }
+
         // Handle clickable rows
         document.querySelectorAll('.clickable-row').forEach(row => {
             row.addEventListener('click', function(e) {
@@ -315,7 +330,7 @@
                             <input type="number" name="amount" id="amount" class="form-control" step="0.01" min="0.01" required 
                                    placeholder="0.00">
                         </div>
-                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                        <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>

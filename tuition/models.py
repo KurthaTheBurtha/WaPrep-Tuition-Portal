@@ -241,7 +241,7 @@ class Student(models.Model, StudentAuditMixin):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
-    grade = models.CharField(max_length=20)
+    grade = models.IntegerField(help_text="Student's grade level (e.g., 1, 2, 3, etc.)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     notes = models.TextField(blank=True, help_text="admin's notes about the student")
     payers = models.ManyToManyField(User, through='StudentPayer', related_name='students')
@@ -440,6 +440,36 @@ class PaymentBreakdown(models.Model, AuditMixin):
         else:
             late_date = self.late_date
         return (timezone.now().date() - late_date).days
+
+    @property
+    def remaining_amount(self):
+        """Calculate the remaining amount to be paid on this bill"""
+        from decimal import Decimal
+        # Sum all payments made towards this bill
+        total_paid = self.payment_items.aggregate(
+            total=models.Sum('amount_paid')
+        )['total'] or Decimal('0.00')
+        
+        # Calculate remaining amount
+        remaining = self.amount - total_paid
+        
+        # Ensure remaining amount is not negative
+        return max(remaining, Decimal('0.00'))
+
+    @property
+    def is_fully_paid(self):
+        """Check if the bill is fully paid"""
+        return self.remaining_amount <= Decimal('0.00')
+
+    @property
+    def payment_status(self):
+        """Get the payment status of the bill"""
+        if self.is_fully_paid:
+            return 'Paid'
+        elif self.remaining_amount < self.amount:
+            return 'Partially Paid'
+        else:
+            return 'Unpaid'
 
     def save(self, *args, **kwargs):
         # Ensure date_incurred is always set

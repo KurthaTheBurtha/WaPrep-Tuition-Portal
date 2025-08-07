@@ -92,7 +92,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
-                                                    <th class="text-end">Amount</th>
+                                                    <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -100,7 +100,7 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
-                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                    <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -146,7 +146,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
-                                                    <th class="text-end">Amount</th>
+                                                    <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -154,7 +154,7 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
-                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                    <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -200,7 +200,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
-                                                    <th class="text-end">Amount</th>
+                                                    <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -208,7 +208,7 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
-                                                    <td class="text-end">${{ item.amount|floatformat:2 }}</td>
+                                                    <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -757,6 +757,21 @@ document.getElementById('stripe-payment-form')?.addEventListener('submit', async
         submitButton.innerHTML = originalText;
     }
 });
+
+// Prevent typing "-" and "+" in payment amount input field
+function preventSpecialChars(event) {
+    const key = event.key;
+    if (key === '-' || key === '+') {
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Add event listener to payment amount input field
+const paymentAmountInput = document.getElementById('payment_amount');
+if (paymentAmountInput) {
+    paymentAmountInput.addEventListener('keydown', preventSpecialChars);
+}
 
 // Payment Amount Selection Functionality
 const overdueItems = {{ overdue_items_json|safe }};

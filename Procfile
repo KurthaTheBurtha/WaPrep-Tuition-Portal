@@ -1,1 +1,1 @@
-web: gunicorn tuition.wsgi --log-file - 
+web: gunicorn tuition.wsgi:application --log-file - --bind 0.0.0.0:$PORT 

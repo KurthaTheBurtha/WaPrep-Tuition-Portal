@@ -188,11 +188,4 @@ SECURE_HSTS_PRELOAD = True
 # HTTPS settings (uncomment when you have SSL)
 # SECURE_SSL_REDIRECT = True
 # SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
-
-# CSRF Trusted Origins
-CSRF_TRUSTED_ORIGINS = [
-    'https://www.waprepauthorizeduser.org',
-    'https://waprepauthorizeduser.org',
-    'https://waprep-tuition-portal.onrender.com',
-] 
+# CSRF_COOKIE_SECURE = True 

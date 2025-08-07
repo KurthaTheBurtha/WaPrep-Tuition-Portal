@@ -86,7 +86,8 @@
                                 <tr>
                                     <th class="border-0 ps-4">Description</th>
                                     <th class="border-0">Date Incurred</th>
-                                    <th class="border-0 text-end">Amount</th>
+                                    <th class="border-0 text-end">Amount Incurred</th>
+                                    <th class="border-0 text-end">Unpaid Amount</th>
                                     <th class="border-0">Due Date</th>
                                     <th class="border-0">Late Date</th>
                                     <th class="border-0">Status</th>
@@ -120,13 +121,26 @@
                                         </td>
                                         <td>{{ bill.date_incurred|date:'M d, Y'|default:'-' }}</td>
                                         <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
+                                        <td class="text-end">
+                                            {% if bill.remaining_amount == 0 %}
+                                                <span class="text-success">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% elif bill.remaining_amount < bill.amount %}
+                                                <span class="text-warning">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-danger">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ bill.due_date|date:'M d, Y' }}</td>
                                         <td>{{ bill.late_date|date:'M d, Y'|default:'-' }}</td>
                                         <td>
-                                            {% if bill.is_overdue %}
+                                            {% if bill.payment_status == 'Paid' %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% elif bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning">Partially Paid</span>
+                                            {% elif bill.is_overdue %}
                                                 <span class="badge bg-danger">Overdue</span>
                                             {% else %}
-                                                <span class="badge bg-warning">Unpaid</span>
+                                                <span class="badge bg-danger">Unpaid</span>
                                             {% endif %}
                                         </td>
                                         <td>
@@ -219,6 +233,7 @@
                                     <th class="border-0 ps-4">Description</th>
                                     <th class="border-0">Date Incurred</th>
                                     <th class="border-0 text-end">Amount</th>
+                                    <th class="border-0 text-end">Remaining</th>
                                     <th class="border-0">Due Date</th>
                                     <th class="border-0">Late Date</th>
                                     <th class="border-0">Status</th>
@@ -252,10 +267,25 @@
                                         </td>
                                         <td>{{ bill.date_incurred|date:'M d, Y'|default:'-' }}</td>
                                         <td class="text-end">${{ bill.amount|floatformat:2 }}</td>
+                                        <td class="text-end">
+                                            {% if bill.remaining_amount == 0 %}
+                                                <span class="text-success">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% elif bill.remaining_amount < bill.amount %}
+                                                <span class="text-warning">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-danger">${{ bill.remaining_amount|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ bill.due_date|date:'M d, Y' }}</td>
                                         <td>{{ bill.late_date|date:'M d, Y'|default:'-' }}</td>
                                         <td>
-                                            <span class="badge bg-success">Paid</span>
+                                            {% if bill.payment_status == 'Paid' %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% elif bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning">Partially Paid</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Unpaid</span>
+                                            {% endif %}
                                         </td>
                                         <td>
                                             {% if bill.show_in_payment_history %}
@@ -523,7 +553,7 @@
                     <div class="mb-3">
                         <label for="amount" class="form-label">Amount ($)</label>
                         <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
-                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                        <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="due_date" class="form-label">Due Date <span class="text-danger">*</span></label>
@@ -588,7 +618,7 @@
                     <div class="mb-3">
                         <label for="edit_amount" class="form-label">Amount ($)</label>
                         <input type="number" step="0.01" class="form-control" name="amount" id="edit_amount" required>
-                        <div class="form-text text-muted">Do not use commas when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                        <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
                     </div>
                     <div class="mb-3">
                         <label for="edit_due_date" class="form-label">Due Date</label>
@@ -630,6 +660,27 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Prevent typing "-" and "+" in amount input fields
+    function preventSpecialChars(event) {
+        const key = event.key;
+        if (key === '-' || key === '+') {
+            event.preventDefault();
+            return false;
+        }
+    }
+
+    // Add event listeners to amount input fields
+    const amountInput = document.getElementById('amount');
+    const editAmountInput = document.getElementById('edit_amount');
+    
+    if (amountInput) {
+        amountInput.addEventListener('keydown', preventSpecialChars);
+    }
+    
+    if (editAmountInput) {
+        editAmountInput.addEventListener('keydown', preventSpecialChars);
+    }
+
     // Set default due date to today when add bill modal opens
     const addBillModal = document.getElementById('addBillModal');
     if (addBillModal) {

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: waprep-tuition-portal
+    env: python
+    plan: free
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: gunicorn tuition.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DJANGO_SETTINGS_MODULE
+        value: tuition.settings_staging
+      - key: DEBUG
+        value: true
+    healthCheckPath: /
+    autoDeploy: true
+
+databases:
+  - name: waprep-tuition-db
+    plan: free

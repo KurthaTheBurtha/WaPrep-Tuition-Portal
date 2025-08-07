@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 # BASE DIRECTORY
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -74,10 +75,8 @@ WSGI_APPLICATION = 'tuition.wsgi.application'
 
 # DATABASE
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
+    
 }
 
 # PASSWORD VALIDATION
@@ -330,8 +329,9 @@ SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.getenv('SESSION_EXPIRE_AT_BROWSER_CLOSE', 'False') == 'True'
-SESSION_COOKIE_AGE = 3600 * 24 * 7  # 7 days
+SESSION_COOKIE_AGE = 900  # 15 minutes (15 * 60 seconds)
 SESSION_SAVE_EVERY_REQUEST = True
+SESSION_IDLE_TIMEOUT = 900  # 15 minutes in seconds
 
 # CSRF Security
 CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
