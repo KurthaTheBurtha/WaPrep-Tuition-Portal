@@ -578,7 +578,7 @@
                         <label class="form-label">Select Bills to Pay *</label>
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            Select which bills this payment should cover. The total amount should match the payment amount.
+                            Select which bills this payment should cover. For partially paid bills, the amount shown is the remaining balance. The total amount should match the payment amount.
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm">
@@ -587,24 +587,35 @@
                                         <th><input type="checkbox" id="select_all_bills"></th>
                                         <th>Description</th>
                                         <th>Due Date</th>
-                                        <th>Amount</th>
+                                        <th>Original Amount</th>
                                         <th>Amount to Pay</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for bill in bills %}
-                                    {% if not bill.is_paid %}
-                                    <tr>
+                                    {% if not bill.is_paid or bill.payment_status == 'Partially Paid' %}
+                                    <tr class="{% if bill.payment_status == 'Partially Paid' %}table-warning{% endif %}">
                                         <td>
                                             <input type="checkbox" name="bill_ids" value="{{ bill.id }}" class="bill-checkbox" 
-                                                   data-bill-amount="{{ bill.amount }}" data-bill-description="{{ bill.description }}">
+                                                   data-bill-amount="{{ bill.remaining_amount }}" data-bill-description="{{ bill.description }}">
                                         </td>
-                                        <td>{{ bill.description }}</td>
+                                        <td>
+                                            {{ bill.description }}
+                                            {% if bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning text-dark ms-2">Partially Paid</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ bill.due_date|date:"M d, Y" }}</td>
-                                        <td>${{ bill.amount|floatformat:2 }}</td>
+                                        <td>
+                                            ${{ bill.amount|floatformat:2 }}
+                                            {% if bill.payment_status == 'Partially Paid' %}
+                                                <br><small class="text-muted">Remaining: ${{ bill.remaining_amount|floatformat:2 }}</small>
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <input type="number" step="0.01" class="form-control form-control-sm bill-amount-input" 
-                                                   name="bill_amount_{{ bill.id }}" value="{{ bill.amount|floatformat:2 }}" 
+                                                   name="bill_amount_{{ bill.id }}" 
+                                                   value="{% if bill.payment_status == 'Partially Paid' %}{{ bill.remaining_amount|floatformat:2 }}{% else %}{{ bill.amount|floatformat:2 }}{% endif %}" 
                                                    style="width: 100px;" disabled>
                                             <small class="form-text text-muted">No special characters</small>
                                         </td>

@@ -61,7 +61,8 @@ class Command(BaseCommand):
                                 PaymentItem.objects.create(
                                     payment=payment,
                                     breakdown_item=item,
-                                    amount_paid=item_amount
+                                    amount_paid=item_amount,
+                                    currency='USD'  # Default to USD
                                 )
                             
                             # Mark payment items as paid

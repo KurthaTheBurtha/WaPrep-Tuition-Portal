@@ -491,14 +491,15 @@ def process_payment(request):
                     if remaining_amount <= 0:
                         break
                     
-                    bill_remaining = bill.remaining_amount
+                    bill_remaining = Decimal(str(bill.remaining_amount))
                     bill_amount = min(remaining_amount, bill_remaining)
                     
                     # Create PaymentItem record
                     PaymentItem.objects.create(
                         payment=payment,
                         breakdown_item=bill,
-                        amount_paid=bill_amount
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
                     )
                     
                     # Check if bill is now fully paid
@@ -513,14 +514,15 @@ def process_payment(request):
                     if remaining_amount <= 0:
                         break
                     
-                    bill_remaining = bill.remaining_amount
+                    bill_remaining = Decimal(str(bill.remaining_amount))
                     bill_amount = min(remaining_amount, bill_remaining)
                     
                     # Create PaymentItem record
                     PaymentItem.objects.create(
                         payment=payment,
                         breakdown_item=bill,
-                        amount_paid=bill_amount
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
                     )
                     
                     # Check if bill is now fully paid
@@ -535,14 +537,15 @@ def process_payment(request):
                     if remaining_amount <= 0:
                         break
                     
-                    bill_remaining = bill.remaining_amount
+                    bill_remaining = Decimal(str(bill.remaining_amount))
                     bill_amount = min(remaining_amount, bill_remaining)
                     
                     # Create PaymentItem record
                     PaymentItem.objects.create(
                         payment=payment,
                         breakdown_item=bill,
-                        amount_paid=bill_amount
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
                     )
                     
                     # Check if bill is now fully paid
@@ -664,7 +667,8 @@ def payment_history(request):
                                 PaymentItem.objects.create(
                                     payment=payment,
                                     breakdown_item=item,
-                                    amount_paid=item_amount
+                                    amount_paid=item_amount,
+                                    currency='USD'  # Default to USD
                                 )
                             
                             # Mark payment items as paid
@@ -1968,6 +1972,7 @@ def monthly_bills(request, student_id, month_key):
                     student=student,
                     description=description,
                     amount=amount,
+                    currency='USD',  # Default currency
                     due_date=due_date,
                     date_incurred=date_incurred if date_incurred else None,
                     late_date=late_date if late_date else None,
@@ -2046,7 +2051,8 @@ def monthly_bills(request, student_id, month_key):
                     status=status,
                     payment_method=payment_method,
                     notes=notes,
-                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    currency='USD'  # Default to USD for manual payments
                 )
                 
                 # Create payment items for each selected bill
@@ -2058,7 +2064,8 @@ def monthly_bills(request, student_id, month_key):
                     PaymentItem.objects.create(
                         payment=payment,
                         breakdown_item=bill,
-                        amount_paid=bill_amount
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
                     )
                     
                     total_paid += float(bill_amount)
@@ -2138,6 +2145,7 @@ def student_months(request, student_id):
                     student=student,
                     description=description,
                     amount=amount,
+                    currency='USD',  # Default currency
                     due_date=due_date,
                     date_incurred=date_incurred if date_incurred else None,
                     late_date=late_date if late_date else None,
@@ -2607,6 +2615,7 @@ def student_bills(request, student_id):
                     student=student,
                     description=description,
                     amount=amount,
+                    currency='USD',  # Default currency
                     due_date=due_date,
                     date_incurred=date_incurred,
                     late_date=late_date,
@@ -2708,7 +2717,8 @@ def student_bills(request, student_id):
                     status=status,
                     payment_method=payment_method,
                     notes=notes,
-                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+                    receipt_number=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    currency='USD'  # Default to USD for manual payments
                 )
                 
                 # Create payment items for each selected bill
@@ -2720,7 +2730,8 @@ def student_bills(request, student_id):
                     PaymentItem.objects.create(
                         payment=payment,
                         breakdown_item=bill,
-                        amount_paid=bill_amount
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
                     )
                     
                     total_paid += float(bill_amount)
@@ -3148,7 +3159,8 @@ def stripe_webhook(request):
                         PaymentItem.objects.create(
                             payment=payment,
                             breakdown_item=item,
-                            amount_paid=item_amount
+                            amount_paid=item_amount,
+                            currency='USD'  # Default to USD
                         )
                     
                     # Mark payment items as paid
@@ -3210,7 +3222,8 @@ def stripe_webhook(request):
                         PaymentItem.objects.create(
                             payment=payment,
                             breakdown_item=item,
-                            amount_paid=item_amount
+                            amount_paid=item_amount,
+                            currency='USD'  # Default to USD
                         )
                     
                     payment_items.update(is_paid=True)
@@ -3430,6 +3443,7 @@ def mass_add_bills(request):
                         student=student,
                         description=description,
                         amount=amount,
+                        currency='USD',  # Default currency
                         due_date=due_date,
                         is_paid=False,
                         show_in_payment_history=show_in_payment_history

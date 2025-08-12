@@ -296,6 +296,11 @@ class Payment(models.Model, PaymentAuditMixin):
     account_type = models.CharField(max_length=10, null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
     receipt_number = models.CharField(max_length=50, unique=True)
+    currency = models.CharField(max_length=3, default='USD', help_text="Currency code (e.g., USD, EUR)")
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True, help_text="Exchange rate to USD")
+    exchange_rate_date = models.DateTimeField(null=True, blank=True, help_text="Date when exchange rate was set")
+    original_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Original amount in original currency")
+    original_currency = models.CharField(max_length=3, null=True, blank=True, help_text="Original currency code")
 
     def __str__(self):
         return f"Payment for {self.student} - {self.amount}"
@@ -387,6 +392,7 @@ class PaymentBreakdown(models.Model, AuditMixin):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payment_breakdowns')
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD', help_text="Currency code (e.g., USD, EUR)")
     due_date = models.DateField(null=True, blank=True)
     date_incurred = models.DateField(
         help_text="The date when this bill was incurred (defaults to creation date)"
@@ -502,6 +508,7 @@ class PaymentItem(models.Model, AuditMixin):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='payment_items')
     breakdown_item = models.ForeignKey(PaymentBreakdown, on_delete=models.CASCADE, related_name='payment_items')
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD', help_text="Currency code (e.g., USD, EUR)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
