@@ -403,6 +403,16 @@ class PaymentBreakdown(models.Model, AuditMixin):
         help_text="The date when this bill becomes late (defaults to last day of current month)"
     )
     is_paid = models.BooleanField(default=False)
+    payment_status_override = models.CharField(
+        max_length=20,
+        choices=[
+            ('unpaid', 'Unpaid'),
+            ('partially_paid', 'Partially Paid'),
+            ('paid', 'Paid'),
+        ],
+        default='unpaid',
+        help_text="Manual override for payment status (overrides automatic calculation)"
+    )
     show_in_payment_history = models.BooleanField(
         default=False, 
         help_text="If checked and bill is paid, this will appear in the payer's payment history"
@@ -470,6 +480,11 @@ class PaymentBreakdown(models.Model, AuditMixin):
     @property
     def payment_status(self):
         """Get the payment status of the bill"""
+        # If there's a manual override, use it
+        if self.payment_status_override != 'unpaid':
+            return self.get_payment_status_override_display()
+        
+        # Otherwise, calculate based on payments
         if self.is_fully_paid:
             return 'Paid'
         elif self.remaining_amount < self.amount:

@@ -33,6 +33,14 @@ from .utils import validate_password, generate_strong_password, clear_messages
 from decimal import Decimal
 from django.views.decorators.csrf import csrf_exempt
 import calendar
+import logging
+from django.core.paginator import Paginator
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.db import transaction
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -1946,17 +1954,21 @@ def monthly_bills(request, student_id, month_key):
     total_amount = bills.aggregate(total=models.Sum('amount'))['total'] or 0
     total_bills = bills.count()
     
-    # Count bills by payment status
-    paid_bills = sum(1 for bill in bills if bill.is_fully_paid)
-    unpaid_bills = sum(1 for bill in bills if not bill.is_fully_paid)
+    # Count bills by payment status, respecting payment_status_override
+    paid_bills = sum(1 for bill in bills if (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+    unpaid_bills = sum(1 for bill in bills if not (bill.is_fully_paid or bill.payment_status_override == 'paid'))
     
-    # Calculate amounts using correct payment logic
+    # Calculate amounts using correct payment logic, respecting payment_status_override
     # For paid_amount: sum fully paid bills + paid portion of partially paid bills
     paid_amount = sum(
-        bill.amount if bill.is_fully_paid else (bill.amount - bill.remaining_amount)
+        bill.amount if (bill.is_fully_paid or bill.payment_status_override == 'paid') else (bill.amount - bill.remaining_amount)
         for bill in bills
     )
-    unpaid_amount = sum(bill.remaining_amount for bill in bills if not bill.is_fully_paid)
+    unpaid_amount = sum(
+        bill.remaining_amount if bill.payment_status_override == 'unpaid' else Decimal('0.00')
+        for bill in bills 
+        if not (bill.is_fully_paid or bill.payment_status_override == 'paid')
+    )
     
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1966,7 +1978,7 @@ def monthly_bills(request, student_id, month_key):
             due_date = request.POST.get('due_date')
             date_incurred = request.POST.get('date_incurred')
             late_date = request.POST.get('late_date')
-            is_paid = request.POST.get('is_paid') == 'on'
+            payment_status = request.POST.get('payment_status', 'unpaid')
             try:
                 PaymentBreakdown.objects.create(
                     student=student,
@@ -1976,7 +1988,8 @@ def monthly_bills(request, student_id, month_key):
                     due_date=due_date,
                     date_incurred=date_incurred if date_incurred else None,
                     late_date=late_date if late_date else None,
-                    is_paid=is_paid,
+                    payment_status_override=payment_status,
+                    is_paid=(payment_status == 'paid'),  # Keep is_paid for backward compatibility
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
                 messages.success(request, 'Bill added successfully.')
@@ -1989,19 +2002,34 @@ def monthly_bills(request, student_id, month_key):
             due_date = request.POST.get('due_date')
             date_incurred = request.POST.get('date_incurred')
             late_date = request.POST.get('late_date')
-            is_paid = request.POST.get('is_paid') == 'on'
+            payment_status = request.POST.get('payment_status', 'unpaid')
             show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             try:
                 bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                
+                # Store the old payment status to check if it changed to 'paid'
+                old_payment_status = bill.payment_status_override
+                
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
                 bill.date_incurred = date_incurred if date_incurred else None
                 bill.late_date = late_date if late_date else None
-                bill.is_paid = is_paid
+                bill.payment_status_override = payment_status
+                bill.is_paid = (payment_status == 'paid')  # Keep is_paid for backward compatibility
                 bill.show_in_payment_history = show_in_payment_history
                 bill.save()
-                messages.success(request, 'Bill updated successfully.')
+                
+                # If the bill was marked as 'paid', create a manual payment to zero out the remaining amount
+                if payment_status == 'paid' and old_payment_status != 'paid':
+                    manual_payment = create_manual_payment_for_bill(bill, student, request.user)
+                    if manual_payment:
+                        messages.success(request, f'Bill updated successfully. Manual payment of ${bill.remaining_amount} created to mark as paid.')
+                    else:
+                        messages.success(request, 'Bill updated successfully.')
+                else:
+                    messages.success(request, 'Bill updated successfully.')
+                    
             except PaymentBreakdown.DoesNotExist:
                 messages.error(request, 'Bill not found.')
             except Exception as e:
@@ -2139,9 +2167,9 @@ def student_months(request, student_id):
             due_date = request.POST.get('due_date')
             date_incurred = request.POST.get('date_incurred')
             late_date = request.POST.get('late_date')
-            is_paid = request.POST.get('is_paid') == 'on'
+            payment_status = request.POST.get('payment_status', 'unpaid')
             try:
-                PaymentBreakdown.objects.create(
+                bill = PaymentBreakdown.objects.create(
                     student=student,
                     description=description,
                     amount=amount,
@@ -2149,10 +2177,21 @@ def student_months(request, student_id):
                     due_date=due_date,
                     date_incurred=date_incurred if date_incurred else None,
                     late_date=late_date if late_date else None,
-                    is_paid=is_paid,
+                    payment_status_override=payment_status,
+                    is_paid=(payment_status == 'paid'),  # Keep is_paid for backward compatibility
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
-                messages.success(request, 'Bill added successfully.')
+                
+                # If the bill was created as 'paid', create a manual payment to zero out the remaining amount
+                if payment_status == 'paid':
+                    manual_payment = create_manual_payment_for_bill(bill, student, request.user)
+                    if manual_payment:
+                        messages.success(request, f'Bill added successfully. Manual payment of ${bill.remaining_amount} created to mark as paid.')
+                    else:
+                        messages.success(request, 'Bill added successfully.')
+                else:
+                    messages.success(request, 'Bill added successfully.')
+                    
             except Exception as e:
                 messages.error(request, f'Error adding bill: {str(e)}')
         
@@ -2161,8 +2200,14 @@ def student_months(request, student_id):
     # Get all bills for this student with due dates
     all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('due_date')
     
-    # Define the billing cycle: June 2025 to May 2026
+    # Define the billing cycle: January 2025 to May 2026
     billing_cycle_months = []
+    
+    # Add January 2025 to May 2025
+    for month in range(1, 6):  # January (1) to May (5)
+        month_key = f"2025-{month:02d}"
+        month_display = f"{calendar.month_name[month]} 2025"
+        billing_cycle_months.append((month_key, month_display))
     
     # Add June 2025 to December 2025
     for month in range(6, 13):  # June (6) to December (12)
@@ -2195,14 +2240,17 @@ def student_months(request, student_id):
         monthly_billing[month_key]['total_bills'] += 1
         monthly_billing[month_key]['total_amount'] += bill.amount
         
-        # Use the correct payment status logic
-        if bill.is_fully_paid:
+        # Use the correct payment status logic, respecting payment_status_override
+        if bill.is_fully_paid or bill.payment_status_override == 'paid':
             monthly_billing[month_key]['paid_bills'] += 1
             monthly_billing[month_key]['paid_amount'] += bill.amount
         else:
             monthly_billing[month_key]['unpaid_bills'] += 1
             # Use remaining amount for unpaid bills to account for partial payments
-            monthly_billing[month_key]['unpaid_amount'] += bill.remaining_amount
+            if bill.payment_status_override == 'unpaid':
+                monthly_billing[month_key]['unpaid_amount'] += bill.remaining_amount
+            else:
+                monthly_billing[month_key]['unpaid_amount'] += Decimal('0.00')
             # Add paid portion of partially paid bills to paid_amount
             if bill.remaining_amount < bill.amount:
                 monthly_billing[month_key]['paid_amount'] += (bill.amount - bill.remaining_amount)
@@ -2230,17 +2278,21 @@ def student_months(request, student_id):
     total_bills = all_bills.count()
     total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
     
-    # Count bills by payment status
-    paid_bills = sum(1 for bill in all_bills if bill.is_fully_paid)
-    unpaid_bills = sum(1 for bill in all_bills if not bill.is_fully_paid)
+    # Count bills by payment status, respecting payment_status_override
+    paid_bills = sum(1 for bill in all_bills if (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+    unpaid_bills = sum(1 for bill in all_bills if not (bill.is_fully_paid or bill.payment_status_override == 'paid'))
     
-    # Calculate amounts using correct payment logic
+    # Calculate amounts using correct payment logic, respecting payment_status_override
     # For paid_amount: sum fully paid bills + paid portion of partially paid bills
     paid_amount = sum(
-        bill.amount if bill.is_fully_paid else (bill.amount - bill.remaining_amount)
+        bill.amount if (bill.is_fully_paid or bill.payment_status_override == 'paid') else (bill.amount - bill.remaining_amount)
         for bill in all_bills
     )
-    unpaid_amount = sum(bill.remaining_amount for bill in all_bills if not bill.is_fully_paid)
+    unpaid_amount = sum(
+        bill.remaining_amount if bill.payment_status_override == 'unpaid' else Decimal('0.00')
+        for bill in all_bills 
+        if not (bill.is_fully_paid or bill.payment_status_override == 'paid')
+    )
     
     context = {
         'student': student,
@@ -2509,17 +2561,21 @@ def manage_billing(request):
         total_bills = all_bills.count()
         total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
         
-        # Count bills by payment status
-        paid_bills = sum(1 for bill in all_bills if bill.is_fully_paid)
-        unpaid_bills = sum(1 for bill in all_bills if not bill.is_fully_paid)
+        # Count bills by payment status, respecting payment_status_override
+        paid_bills = sum(1 for bill in all_bills if (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+        unpaid_bills = sum(1 for bill in all_bills if not (bill.is_fully_paid or bill.payment_status_override == 'paid'))
         
-        # Calculate amounts using correct payment logic
+        # Calculate amounts using correct payment logic, respecting payment_status_override
         # For paid_amount: sum fully paid bills + paid portion of partially paid bills
         paid_amount = sum(
-            bill.amount if bill.is_fully_paid else (bill.amount - bill.remaining_amount)
+            bill.amount if (bill.is_fully_paid or bill.payment_status_override == 'paid') else (bill.amount - bill.remaining_amount)
             for bill in all_bills
         )
-        unpaid_amount = sum(bill.remaining_amount for bill in all_bills if not bill.is_fully_paid)
+        unpaid_amount = sum(
+            bill.remaining_amount if bill.payment_status_override == 'unpaid' else Decimal('0.00')
+            for bill in all_bills 
+            if not (bill.is_fully_paid or bill.payment_status_override == 'paid')
+        )
         
         # Get unique months for this student
         months = all_bills.dates('due_date', 'month', order='DESC')
@@ -2590,7 +2646,7 @@ def student_bills(request, student_id):
             due_date_str = request.POST.get('due_date')
             date_incurred_str = request.POST.get('date_incurred')
             late_date_str = request.POST.get('late_date')
-            is_paid = request.POST.get('is_paid') == 'on'
+            payment_status = request.POST.get('payment_status', 'unpaid')
             
             try:
                 # Convert string dates to date objects
@@ -2619,7 +2675,8 @@ def student_bills(request, student_id):
                     due_date=due_date,
                     date_incurred=date_incurred,
                     late_date=late_date,
-                    is_paid=is_paid,
+                    payment_status_override=payment_status,
+                    is_paid=(payment_status == 'paid'),  # Keep is_paid for backward compatibility
                     show_in_payment_history=True  # Always show in payment history for new bills
                 )
                 messages.success(request, 'Bill added successfully.')
@@ -2634,7 +2691,7 @@ def student_bills(request, student_id):
             due_date_str = request.POST.get('due_date')
             date_incurred_str = request.POST.get('date_incurred')
             late_date_str = request.POST.get('late_date')
-            is_paid = request.POST.get('is_paid') == 'on'
+            payment_status = request.POST.get('payment_status', 'unpaid')
             show_in_payment_history = request.POST.get('show_in_payment_history') == 'on'
             
             try:
@@ -2657,15 +2714,30 @@ def student_bills(request, student_id):
                     late_date = datetime.strptime(late_date_str, '%Y-%m-%d').date()
                 
                 bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
+                
+                # Store the old payment status to check if it changed to 'paid'
+                old_payment_status = bill.payment_status_override
+                
                 bill.description = description
                 bill.amount = amount
                 bill.due_date = due_date
                 bill.date_incurred = date_incurred
                 bill.late_date = late_date
-                bill.is_paid = is_paid
+                bill.payment_status_override = payment_status
+                bill.is_paid = (payment_status == 'paid')  # Keep is_paid for backward compatibility
                 bill.show_in_payment_history = show_in_payment_history
                 bill.save()
-                messages.success(request, 'Bill updated successfully.')
+                
+                # If the bill was marked as 'paid', create a manual payment to zero out the remaining amount
+                if payment_status == 'paid' and old_payment_status != 'paid':
+                    manual_payment = create_manual_payment_for_bill(bill, student, request.user)
+                    if manual_payment:
+                        messages.success(request, f'Bill updated successfully. Manual payment of ${bill.remaining_amount} created to mark as paid.')
+                    else:
+                        messages.success(request, 'Bill updated successfully.')
+                else:
+                    messages.success(request, 'Bill updated successfully.')
+                    
             except PaymentBreakdown.DoesNotExist:
                 messages.error(request, 'Bill not found.')
             except ValueError as e:
@@ -3651,11 +3723,14 @@ def payer_view_upcoming_bills(request, student_id):
         monthly_billing[month_key]['bills'].append(bill)
         monthly_billing[month_key]['total_amount'] += bill.amount  # Keep original amount for total
         monthly_billing[month_key]['total_bills'] += 1
-        if bill.is_fully_paid:
+        if bill.is_fully_paid or bill.payment_status_override == 'paid':
             monthly_billing[month_key]['paid_amount'] += bill.amount
             monthly_billing[month_key]['paid_bills'] += 1
         else:
-            monthly_billing[month_key]['unpaid_amount'] += bill.remaining_amount  # Use remaining amount for unpaid
+            if bill.payment_status_override == 'unpaid':
+                monthly_billing[month_key]['unpaid_amount'] += bill.remaining_amount  # Use remaining amount for unpaid
+            else:
+                monthly_billing[month_key]['unpaid_amount'] += Decimal('0.00')
             monthly_billing[month_key]['unpaid_bills'] += 1
 
     # Sort bills within each month by status (unpaid first, then paid)
@@ -3705,13 +3780,20 @@ def payer_view_upcoming_bills(request, student_id):
                 'is_current_month': (month_key == current_month_key)
             }))
     
-    # Calculate student totals using remaining amounts for unpaid bills
+    # Calculate student totals using remaining amounts for unpaid bills, respecting payment_status_override
     total_bills = all_bills.count()
     total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
-    paid_bills = sum(1 for bill in all_bills if bill.is_fully_paid)
-    unpaid_bills = sum(1 for bill in all_bills if not bill.is_fully_paid)
-    paid_amount = sum(bill.amount for bill in all_bills if bill.is_fully_paid)
-    unpaid_amount = sum(bill.remaining_amount for bill in all_bills if not bill.is_fully_paid)
+    paid_bills = sum(1 for bill in all_bills if (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+    unpaid_bills = sum(1 for bill in all_bills if not (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+    paid_amount = sum(
+        bill.amount if (bill.is_fully_paid or bill.payment_status_override == 'paid') else (bill.amount - bill.remaining_amount)
+        for bill in all_bills
+    )
+    unpaid_amount = sum(
+        bill.remaining_amount if bill.payment_status_override == 'unpaid' else Decimal('0.00')
+        for bill in all_bills 
+        if not (bill.is_fully_paid or bill.payment_status_override == 'paid')
+    )
     
     context = {
         'student': student,
@@ -3724,4 +3806,70 @@ def payer_view_upcoming_bills(request, student_id):
         'unpaid_amount': unpaid_amount,
     }
     return render(request, 'payer_upcoming_bills.html', context)
+
+def create_manual_payment_for_bill(bill, student, admin_user):
+    """
+    Create a manual payment to mark a bill as paid when payment_status_override is set to 'paid'.
+    This ensures the remaining_amount is zeroed out and financial totals are updated correctly.
+    """
+    try:
+        # Check if there's already a manual payment for this bill
+        existing_payment = PaymentItem.objects.filter(
+            breakdown_item=bill,
+            payment__payment_method='manual',
+            payment__notes__icontains='Status override payment'
+        ).first()
+        
+        if existing_payment:
+            # Update existing payment if needed
+            return existing_payment.payment
+        
+        # Get the first payer associated with this student
+        payer = User.objects.filter(
+            studentpayer__student=student,
+            user_type='payer'
+        ).first()
+        
+        if not payer:
+            # If no payer exists, create a system payment
+            payer = None
+        
+        # Calculate the amount needed to fully pay the bill
+        remaining_amount = bill.remaining_amount
+        if remaining_amount <= 0:
+            return None  # Bill is already fully paid
+        
+        # Create the payment
+        payment = Payment.objects.create(
+            student=student,
+            payer=payer,
+            amount=remaining_amount,
+            payment_date=timezone.now().date(),
+            status='completed',
+            payment_method='manual',
+            notes=f'Status override payment - {admin_user.first_name} {admin_user.last_name} marked bill as paid',
+            receipt_number=f"OVERRIDE-{timezone.now().strftime('%Y%m%d%H%M%S%f')}",
+            currency='USD'
+        )
+        
+        # Create payment item
+        PaymentItem.objects.create(
+            payment=payment,
+            breakdown_item=bill,
+            amount_paid=remaining_amount,
+            currency='USD'
+        )
+        
+        # Update student's current balance
+        student.current_balance = student.current_balance - remaining_amount
+        student.save()
+        
+        logger.info(f"Created manual payment of ${remaining_amount} for bill {bill.id} (Status override)")
+        return payment
+        
+    except Exception as e:
+        logger.error(f"Error creating manual payment for bill {bill.id}: {str(e)}")
+        return None
+
+
 
