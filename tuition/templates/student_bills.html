@@ -110,6 +110,7 @@
                                         data-bill-date-incurred="{{ bill.date_incurred|date:'Y-m-d'|default:'' }}"
                                         data-bill-late-date="{{ bill.late_date|date:'Y-m-d'|default:'' }}"
                                         data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                        data-bill-payment-status="{{ bill.payment_status_override }}"
                                         data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
                                         <td class="ps-4">
                                             {% if forloop.first %}
@@ -162,6 +163,7 @@
                                                     data-bill-date-incurred="{{ bill.date_incurred|date:'Y-m-d'|default:'' }}"
                                                     data-bill-late-date="{{ bill.late_date|date:'Y-m-d'|default:'' }}"
                                                     data-bill-is-paid="{{ bill.is_paid|yesno:'true,false' }}"
+                                                    data-bill-payment-status="{{ bill.payment_status_override }}"
                                                     data-bill-show-in-history="{{ bill.show_in_payment_history|yesno:'true,false' }}">
                                                 <i class="fas fa-edit me-1"></i> Edit
                                             </button>
@@ -565,12 +567,13 @@
                         <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid">
-                            <label class="form-check-label" for="is_paid">
-                                Mark as paid
-                            </label>
-                        </div>
+                        <label for="payment_status" class="form-label">Payment Status</label>
+                        <select class="form-select" name="payment_status" id="payment_status">
+                            <option value="unpaid">Unpaid</option>
+                            <option value="partially_paid">Partially Paid</option>
+                            <option value="paid">Paid</option>
+                        </select>
+                        <div class="form-text">Select the payment status for this bill</div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -630,12 +633,13 @@
                         <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_paid" id="edit_is_paid">
-                            <label class="form-check-label" for="edit_is_paid">
-                                Mark as Paid
-                            </label>
-                        </div>
+                        <label for="edit_payment_status" class="form-label">Payment Status</label>
+                        <select class="form-select" name="payment_status" id="edit_payment_status">
+                            <option value="unpaid">Unpaid</option>
+                            <option value="partially_paid">Partially Paid</option>
+                            <option value="paid">Paid</option>
+                        </select>
+                        <div class="form-text">Select the payment status for this bill</div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -705,6 +709,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateIncurred = button.getAttribute('data-bill-date-incurred');
             const lateDate = button.getAttribute('data-bill-late-date');
             const isPaid = button.getAttribute('data-bill-is-paid') === 'true';
+            const paymentStatus = button.getAttribute('data-bill-payment-status') || 'unpaid';
             const showInHistory = button.getAttribute('data-bill-show-in-history') === 'true';
             
             // Populate the form fields
@@ -714,7 +719,13 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('edit_due_date').value = dueDate;
             document.getElementById('edit_date_incurred').value = dateIncurred || '';
             document.getElementById('edit_late_date').value = lateDate || '';
-            document.getElementById('edit_is_paid').checked = isPaid;
+            
+            // Set payment status
+            const paymentStatusSelect = document.getElementById('edit_payment_status');
+            if (paymentStatusSelect) {
+                paymentStatusSelect.value = paymentStatus;
+            }
+            
             document.getElementById('edit_show_in_payment_history').checked = showInHistory;
         });
     }
