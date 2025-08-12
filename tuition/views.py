@@ -2549,8 +2549,42 @@ def manage_billing(request):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('home')
     
+    # Get search and sort parameters
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', 'student_name')
+    sort_order = request.GET.get('order', 'asc')
+    
     # Get all students with their billing summary
-    students = Student.objects.all().order_by('last_name', 'first_name')
+    students = Student.objects.all()
+    
+    # Apply search filter
+    if search_query:
+        students = students.filter(
+            models.Q(first_name__icontains=search_query) |
+            models.Q(last_name__icontains=search_query) |
+            models.Q(grade__icontains=search_query)
+        )
+    
+    # Apply sorting to students
+    if sort_by == 'student_name':
+        if sort_order == 'desc':
+            students = students.order_by('-last_name', '-first_name')
+        else:
+            students = students.order_by('last_name', 'first_name')
+    elif sort_by == 'student_id':
+        if sort_order == 'desc':
+            students = students.order_by('-student_id')
+        else:
+            students = students.order_by('student_id')
+    elif sort_by == 'grade':
+        if sort_order == 'desc':
+            students = students.order_by('-grade')
+        else:
+            students = students.order_by('grade')
+    else:
+        # Default sorting
+        students = students.order_by('last_name', 'first_name')
+    
     student_billing = []
     
     for student in students:
@@ -2592,6 +2626,11 @@ def manage_billing(request):
             'months': months
         })
     
+    # Apply additional sorting to student_billing list if needed
+    if sort_by in ['total_amount', 'paid_amount', 'unpaid_amount', 'total_bills']:
+        reverse_sort = sort_order == 'desc'
+        student_billing.sort(key=lambda x: x[sort_by], reverse=reverse_sort)
+    
     # Calculate overall statistics
     total_students = len(student_billing)
     total_all_bills = sum(s['total_bills'] for s in student_billing)
@@ -2606,6 +2645,9 @@ def manage_billing(request):
         'total_all_amount': total_all_amount,
         'total_all_paid': total_all_paid,
         'total_all_unpaid': total_all_unpaid,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
     }
     return render(request, 'manage_billing.html', context)
 
