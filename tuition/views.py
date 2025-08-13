@@ -2551,8 +2551,8 @@ def manage_billing(request):
     
     # Get search and sort parameters
     search_query = request.GET.get('search', '')
-    sort_by = request.GET.get('sort', 'student_name')
-    sort_order = request.GET.get('order', 'asc')
+    sort_by = request.GET.get('sort', 'grade')
+    sort_order = request.GET.get('order', 'desc')
     
     # Get all students with their billing summary
     students = Student.objects.all()
@@ -2650,6 +2650,121 @@ def manage_billing(request):
         'sort_order': sort_order,
     }
     return render(request, 'manage_billing.html', context)
+
+@login_required
+def download_billing_spreadsheet(request):
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+    
+    # Get search and sort parameters (same as manage_billing)
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', 'grade')
+    sort_order = request.GET.get('order', 'desc')
+    
+    # Get all students with their billing summary (same logic as manage_billing)
+    students = Student.objects.all()
+    
+    # Apply search filter
+    if search_query:
+        students = students.filter(
+            models.Q(first_name__icontains=search_query) |
+            models.Q(last_name__icontains=search_query) |
+            models.Q(grade__icontains=search_query)
+        )
+    
+    # Apply sorting to students
+    if sort_by == 'student_name':
+        if sort_order == 'desc':
+            students = students.order_by('-last_name', '-first_name')
+        else:
+            students = students.order_by('last_name', 'first_name')
+    elif sort_by == 'student_id':
+        if sort_order == 'desc':
+            students = students.order_by('-student_id')
+        else:
+            students = students.order_by('student_id')
+    elif sort_by == 'grade':
+        if sort_order == 'desc':
+            students = students.order_by('-grade')
+        else:
+            students = students.order_by('grade')
+    else:
+        # Default sorting
+        students = students.order_by('last_name', 'first_name')
+    
+    student_billing = []
+    
+    for student in students:
+        # Get all bills for this student
+        all_bills = student.payment_breakdowns.filter(due_date__isnull=False)
+        
+        # Calculate totals using correct payment logic
+        total_bills = all_bills.count()
+        total_amount = all_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+        
+        # Count bills by payment status, respecting payment_status_override
+        paid_bills = sum(1 for bill in all_bills if (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+        unpaid_bills = sum(1 for bill in all_bills if not (bill.is_fully_paid or bill.payment_status_override == 'paid'))
+        
+        # Calculate amounts using correct payment logic, respecting payment_status_override
+        # For paid_amount: sum fully paid bills + paid portion of partially paid bills
+        paid_amount = sum(
+            bill.amount if (bill.is_fully_paid or bill.payment_status_override == 'paid') else (bill.amount - bill.remaining_amount)
+            for bill in all_bills
+        )
+        unpaid_amount = sum(
+            bill.remaining_amount if bill.payment_status_override == 'unpaid' else Decimal('0.00')
+            for bill in all_bills 
+            if not (bill.is_fully_paid or bill.payment_status_override == 'paid')
+        )
+        
+        # Get unique months for this student
+        months = all_bills.dates('due_date', 'month', order='DESC')
+        
+        student_billing.append({
+            'student': student,
+            'total_bills': total_bills,
+            'total_amount': total_amount,
+            'paid_bills': paid_bills,
+            'unpaid_bills': unpaid_bills,
+            'paid_amount': paid_amount,
+            'unpaid_amount': unpaid_amount,
+            'months_count': len(months),
+            'months': months
+        })
+    
+    # Apply additional sorting to student_billing list if needed
+    if sort_by in ['total_amount', 'paid_amount', 'unpaid_amount', 'total_bills']:
+        reverse_sort = sort_order == 'desc'
+        student_billing.sort(key=lambda x: x[sort_by], reverse=reverse_sort)
+    
+    # Create CSV response
+    import csv
+    from io import StringIO
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="billing_summary_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    # Create CSV writer
+    writer = csv.writer(response)
+    
+    # Write header row
+    writer.writerow(['Student Name', 'Student ID', 'Grade', 'Total Amount', 'Paid Amount', 'Unpaid Amount', 'Total Bills'])
+    
+    # Write data rows
+    for entry in student_billing:
+        writer.writerow([
+            f"{entry['student'].first_name} {entry['student'].last_name}",
+            entry['student'].student_id,
+            entry['student'].grade,
+            f"${entry['total_amount']:.2f}",
+            f"${entry['paid_amount']:.2f}",
+            f"${entry['unpaid_amount']:.2f}",
+            entry['total_bills']
+        ])
+    
+    return response
 
 @login_required
 def student_bills(request, student_id):
