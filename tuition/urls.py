@@ -46,6 +46,7 @@ urlpatterns = [
     path('remove-payment-method/<str:payment_method_id>/', views.remove_payment_method, name='remove_payment_method'),
     path('manage-billing/', views.manage_billing, name='manage_billing'),
     path('manage-billing/download/', views.download_billing_spreadsheet, name='download_billing_spreadsheet'),
+    path('manage-billing/send-reminder/<int:student_id>/', views.send_bill_reminder, name='send_bill_reminder'),
     path('manage-billing/student/<int:student_id>/', views.student_months, name='student_months'),
     path('manage-billing/student/<int:student_id>/<str:month_key>/', views.monthly_bills, name='monthly_bills'),
     path('manage-billing/<int:student_id>/', views.student_bills, name='student_bills'),

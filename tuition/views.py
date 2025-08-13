@@ -3826,6 +3826,102 @@ WAPrep Administration
     return redirect('manage_billing')
 
 @login_required
+def send_bill_reminder(request, student_id):
+    """Send bill reminder to parents of a specific student"""
+    # Only allow admin users
+    if request.user.user_type != 'admin':
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('admin_login')
+    
+    try:
+        student = Student.objects.get(id=student_id)
+        
+        # Get all payers for this student
+        student_payers = StudentPayer.objects.filter(student=student)
+        
+        if not student_payers.exists():
+            messages.error(request, f'No payers found for {student.first_name} {student.last_name}.')
+            return redirect('manage_billing')
+        
+        # Get unpaid bills for this student
+        unpaid_bills = PaymentBreakdown.objects.filter(
+            student=student,
+            is_paid=False
+        ).order_by('due_date')
+        
+        if not unpaid_bills.exists():
+            messages.info(request, f'{student.first_name} {student.last_name} has no unpaid bills.')
+            return redirect('manage_billing')
+        
+        # Calculate total unpaid amount
+        total_unpaid = unpaid_bills.aggregate(total=models.Sum('amount'))['total'] or 0
+        
+        # Send reminders to all active payers
+        payer_emails_sent = 0
+        error_details = []
+        
+        for student_payer in student_payers:
+            payer = student_payer.payer
+            
+            # Only send to active payers
+            if not payer.is_active:
+                continue
+            
+            # Create bill reminder email
+            subject = 'WAPrep Tuition Portal - Bill Reminder'
+            message = f"""
+Hello {payer.first_name},
+
+This is a reminder that you have outstanding bills for {student.first_name} {student.last_name} at Washington Preparatory School.
+
+Total Outstanding Amount: ${total_unpaid:.2f}
+
+Outstanding Bills:
+"""
+            
+            for bill in unpaid_bills:
+                due_date_str = bill.due_date.strftime('%B %d, %Y') if bill.due_date else 'No due date'
+                message += f"- {bill.description}: ${bill.amount:.2f} (Due: {due_date_str})\n"
+            
+            message += f"""
+
+To view and pay these bills, please log in to your account at:
+{request.build_absolute_uri('/')}
+
+If you have any questions, please contact us.
+
+Best regards,
+WAPrep Administration
+            """.strip()
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [payer.email],
+                    fail_silently=False,
+                )
+                payer_emails_sent += 1
+            except Exception as e:
+                error_details.append(f"Failed to send to {payer.email}: {str(e)}")
+                print(f"Error sending reminder to {payer.email}: {str(e)}")
+        
+        if payer_emails_sent > 0:
+            messages.success(request, f'Bill reminder sent to {payer_emails_sent} payer(s) for {student.first_name} {student.last_name}.')
+        else:
+            messages.warning(request, f'Failed to send bill reminders for {student.first_name} {student.last_name}. Check logs for details.')
+            if error_details:
+                messages.warning(request, f'Errors: {", ".join(error_details[:3])}')
+        
+    except Student.DoesNotExist:
+        messages.error(request, 'Student not found.')
+    except Exception as e:
+        messages.error(request, f'Error sending bill reminder: {str(e)}')
+    
+    return redirect('manage_billing')
+
+@login_required
 def payer_view_upcoming_bills(request, student_id):
     """View for payers to see upcoming bills by month for a specific student"""
     if request.user.user_type != 'payer':

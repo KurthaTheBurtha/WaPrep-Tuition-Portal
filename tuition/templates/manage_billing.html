@@ -293,11 +293,18 @@
                                             <span class="text-danger fw-bold">${{ entry.unpaid_amount|floatformat:2 }}</span>
                                         </td>
                                         <td class="text-end pe-4">
-                                            <a href="{% url 'student_months' student_id=entry.student.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();"
-                                               data-bs-toggle="tooltip" data-bs-placement="top" 
-                                               title="View monthly billing details">
-                                                <i class="fas fa-calendar me-1"></i> View Months
-                                            </a>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'student_months' student_id=entry.student.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();"
+                                                   data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                   title="View monthly billing details">
+                                                    <i class="fas fa-calendar me-1"></i> View Months
+                                                </a>
+                                                <a href="{% url 'send_bill_reminder' student_id=entry.student.id %}" class="btn btn-sm btn-outline-warning" onclick="event.stopPropagation();"
+                                                   data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                   title="Send bill reminder to parents">
+                                                    <i class="fas fa-bell me-1"></i> Send Reminder
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
