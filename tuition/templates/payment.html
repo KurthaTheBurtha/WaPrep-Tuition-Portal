@@ -239,32 +239,11 @@
                     </div>
                 </div>
 
-                <!-- Total Summary -->
+                <!-- Total Due -->
                 <div class="card bg-light">
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
-                                <h6 class="mb-2">Payment Summary</h6>
-                                {% if overdue_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box overdue-box">
-                                        <span class="text-danger">Overdue:</span>
-                                        <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                                {% if current_month_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box current-box">
-                                        <span class="text-warning">Current Month:</span>
-                                        <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                                {% if future_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box future-box">
-                                        <span class="text-info">Future:</span>
-                                        <span class="text-info">${{ future_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6 text-end">
+                            <div class="col-12 text-end">
                                 <h5 class="mb-0">Total Due: <strong>${{ total_amount_due|floatformat:2 }}</strong></h5>
                             </div>
                         </div>
