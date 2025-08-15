@@ -111,12 +111,17 @@
         </div>
     </div>
 
-    <!-- Add Bill Button -->
+    <!-- Add Bill and Payment Buttons -->
     <div class="row mb-4">
         <div class="col-12">
-            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal">
-                <i class="fas fa-plus me-1"></i> Add New Bill
-            </button>
+            <div>
+                <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal">
+                    <i class="fas fa-plus me-1"></i> Add New Bill
+                </button>
+                <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+                    <i class="fas fa-credit-card me-1"></i> Add Payment
+                </button>
+            </div>
         </div>
     </div>
 
@@ -296,6 +301,62 @@
                 modal.show();
             }
         };
+
+        // Add Payment Modal functionality
+        // Set default payment date to current date/time
+        const paymentDateInput = document.getElementById('payment_date');
+        if (paymentDateInput) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            paymentDateInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // Handle payment form submission
+        const addPaymentForm = document.getElementById('addPaymentForm');
+        const submitPaymentBtn = document.getElementById('submitPaymentBtn');
+        
+        if (addPaymentForm) {
+            addPaymentForm.addEventListener('submit', function(e) {
+                // Validate form
+                const payerId = document.getElementById('payment_payer').value;
+                const amount = document.getElementById('payment_amount').value;
+                const paymentDate = document.getElementById('payment_date').value;
+                
+                if (!payerId || !amount || !paymentDate) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields.');
+                    return false;
+                }
+                
+                // Validate payment amount is greater than 0
+                const paymentAmount = parseFloat(amount);
+                if (paymentAmount <= 0) {
+                    e.preventDefault();
+                    alert('Payment amount must be greater than $0.');
+                    document.getElementById('payment_amount').focus();
+                    return false;
+                }
+                
+                // Additional validation - ensure amount is reasonable
+                if (paymentAmount > 100000) {
+                    e.preventDefault();
+                    alert('Payment amount exceeds maximum allowed limit of $100,000.');
+                    document.getElementById('payment_amount').focus();
+                    return false;
+                }
+                
+                // Show loading state
+                if (submitPaymentBtn) {
+                    submitPaymentBtn.disabled = true;
+                    submitPaymentBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
+                }
+            });
+        }
+
     });
 </script>
 {% endblock %}
@@ -342,18 +403,300 @@
                         <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid">
-                            <label class="form-check-label" for="is_paid">
-                                Mark as paid
-                            </label>
-                        </div>
+                        <label for="payment_status" class="form-label">Payment Status</label>
+                        <select class="form-select" name="payment_status" id="payment_status">
+                            <option value="unpaid">Unpaid</option>
+                            <option value="paid">Paid</option>
+                        </select>
+                        <div class="form-text">Select the payment status for this bill</div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Add Bill
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Payment Modal -->
+<div class="modal fade" id="addPaymentModal" tabindex="-1" aria-labelledby="addPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <form method="post" id="addPaymentForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_payment">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addPaymentModalLabel">Add Payment for {{ student.first_name }} {{ student.last_name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_payer" class="form-label">Payer *</label>
+                                <select class="form-select" name="payer_id" id="payment_payer" required>
+                                    <option value="">Select a payer...</option>
+                                    {% for student_payer in student.studentpayer_set.all %}
+                                        <option value="{{ student_payer.payer.id }}">
+                                            {{ student_payer.payer.first_name }} {{ student_payer.payer.last_name }}
+                                            {% if student_payer.is_primary %}(Primary){% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_amount" class="form-label">Payment Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" name="amount" id="payment_amount" min="0.01" required onchange="validatePaymentAmount(this)">
+                                </div>
+                                <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_date" class="form-label">Payment Date *</label>
+                                <input type="datetime-local" class="form-control" name="payment_date" id="payment_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_method" class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method" id="payment_method">
+                                    <option value="manual">Manual</option>
+                                    <option value="check">Check</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_notes" class="form-label">Notes</label>
+                                <textarea class="form-control" name="notes" id="payment_notes" rows="3" placeholder="Optional notes about this payment"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Payment Distribution</label>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Payment will be automatically distributed to bills in priority order: Overdue → Current Month → Future. The system will pay the most urgent bills first.
+                        </div>
+                        
+                        <!-- Payment Breakdown -->
+                        <div class="payment-breakdown">
+                            <h6>Payment Breakdown</h6>
+                            
+                            <!-- Overdue Items Accordion -->
+                            <div class="accordion mb-3" id="overdueAccordion">
+                                <div class="accordion-item border-danger">
+                                    <h2 class="accordion-header" id="overdueHeading">
+                                        <button class="accordion-button {% if not overdue_items %}collapsed{% endif %}" style="background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;" type="button" data-bs-toggle="collapse" data-bs-target="#overdueCollapse" aria-expanded="{% if overdue_items %}true{% else %}false{% endif %}" aria-controls="overdueCollapse">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>Overdue Items
+                                            {% if overdue_items %}
+                                                <span class="badge ms-2" style="background-color: #721c24; color: white;">{{ overdue_items|length }} item{{ overdue_items|length|pluralize }}</span>
+                                                <span class="ms-auto">${{ overdue_total|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </button>
+                                    </h2>
+                                    <div id="overdueCollapse" class="accordion-collapse collapse {% if overdue_items %}show{% endif %}" aria-labelledby="overdueHeading" data-bs-parent="#overdueAccordion">
+                                        <div class="accordion-body">
+                                            {% if overdue_items %}
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead class="bg-light">
+                                                            <tr>
+                                                                <th>Description</th>
+                                                                <th>Due Date</th>
+                                                                <th>Late Date</th>
+                                                                <th class="text-end">Unpaid Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for item in overdue_items %}
+                                                            <tr>
+                                                                <td>{{ item.description }}</td>
+                                                                <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                                <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
+                                                                <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr>
+                                                                <td colspan="3" class="text-end"><strong>Overdue Total:</strong></td>
+                                                                <td class="text-end"><strong>${{ overdue_total|floatformat:2 }}</strong></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-center py-3">
+                                                    <div class="text-muted">
+                                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                                        <p class="mb-0">No overdue items</p>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Current Month Items Accordion -->
+                            <div class="accordion mb-3" id="currentMonthAccordion">
+                                <div class="accordion-item border-warning">
+                                    <h2 class="accordion-header" id="currentMonthHeading">
+                                        <button class="accordion-button {% if not current_month_items %}collapsed{% endif %}" style="background-color: #fff3cd; border-color: #ffeaa7; color: #856404;" type="button" data-bs-toggle="collapse" data-bs-target="#currentMonthCollapse" aria-expanded="{% if current_month_items %}true{% else %}false{% endif %}" aria-controls="currentMonthCollapse">
+                                            <i class="fas fa-calendar-day me-2"></i>Due This Month
+                                            {% if current_month_items %}
+                                                <span class="badge ms-2" style="background-color: #856404; color: white;">{{ current_month_items|length }} item{{ current_month_items|length|pluralize }}</span>
+                                                <span class="ms-auto">${{ current_month_total|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </button>
+                                    </h2>
+                                    <div id="currentMonthCollapse" class="accordion-collapse collapse {% if current_month_items %}show{% endif %}" aria-labelledby="currentMonthHeading" data-bs-parent="#currentMonthAccordion">
+                                        <div class="accordion-body">
+                                            {% if current_month_items %}
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead class="bg-light">
+                                                            <tr>
+                                                                <th>Description</th>
+                                                                <th>Due Date</th>
+                                                                <th>Late Date</th>
+                                                                <th class="text-end">Unpaid Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for item in current_month_items %}
+                                                            <tr>
+                                                                <td>{{ item.description }}</td>
+                                                                <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                                <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
+                                                                <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr>
+                                                                <td colspan="3" class="text-end"><strong>Current Month Total:</strong></td>
+                                                                <td class="text-end"><strong>${{ current_month_total|floatformat:2 }}</strong></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-center py-3">
+                                                    <div class="text-muted">
+                                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                                        <p class="mb-0">No items due this month</p>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Future Items Accordion -->
+                            <div class="accordion mb-3" id="futureAccordion">
+                                <div class="accordion-item border-info">
+                                    <h2 class="accordion-header" id="futureHeading">
+                                        <button class="accordion-button collapsed" style="background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;" type="button" data-bs-toggle="collapse" data-bs-target="#futureCollapse" aria-expanded="false" aria-controls="futureCollapse">
+                                            <i class="fas fa-calendar-alt me-2"></i>Future Items
+                                            {% if future_items %}
+                                                <span class="badge ms-2" style="background-color: #0c5460; color: white;">{{ future_items|length }} item{{ future_items|length|pluralize }}</span>
+                                                <span class="ms-auto">${{ future_total|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </button>
+                                    </h2>
+                                    <div id="futureCollapse" class="accordion-collapse collapse" aria-labelledby="futureHeading" data-bs-parent="#futureAccordion">
+                                        <div class="accordion-body">
+                                            {% if future_items %}
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead class="bg-light">
+                                                            <tr>
+                                                                <th>Description</th>
+                                                                <th>Due Date</th>
+                                                                <th>Late Date</th>
+                                                                <th class="text-end">Unpaid Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for item in future_items %}
+                                                            <tr>
+                                                                <td>{{ item.description }}</td>
+                                                                <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                                <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
+                                                                <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr>
+                                                                <td colspan="3" class="text-end"><strong>Future Total:</strong></td>
+                                                                <td class="text-end"><strong>${{ future_total|floatformat:2 }}</strong></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-center py-3">
+                                                    <div class="text-muted">
+                                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                                        <p class="mb-0">No future items</p>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Total Summary -->
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="mb-2">Payment Summary</h6>
+                                            {% if overdue_total > 0 %}
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-danger">Overdue:</span>
+                                                    <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if current_month_total > 0 %}
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-warning">Current Month:</span>
+                                                    <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
+                                                </div>
+                                            {% endif %}
+                                            {% if future_total > 0 %}
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-info">Future:</span>
+                                                    <span class="text-info">${{ future_total|floatformat:2 }}</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6 text-end">
+                                            <h5 class="mb-0">Total Due: <strong>${{ total_amount_due|floatformat:2 }}</strong></h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="submitPaymentBtn">
+                        <i class="fas fa-plus me-1"></i> Add Payment
                     </button>
                 </div>
             </form>
