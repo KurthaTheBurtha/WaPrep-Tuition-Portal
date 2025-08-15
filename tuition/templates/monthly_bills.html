@@ -124,7 +124,7 @@
                 <i class="fas fa-plus me-1"></i> Add Bill
             </button>
             <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" id="addPaymentBtn">
-                <i class="fas fa-credit-card me-1"></i> Add Payment for {{ month_display }}
+                <i class="fas fa-credit-card me-1"></i> Add Payment
             </button>
         </div>
     </div>
@@ -438,7 +438,6 @@
                         <label for="payment_status" class="form-label">Payment Status</label>
                         <select class="form-select" name="payment_status" id="payment_status">
                             <option value="unpaid">Unpaid</option>
-                            <option value="partially_paid">Partially Paid</option>
                             <option value="paid">Paid</option>
                         </select>
                         <div class="form-text">Select the payment status for this bill</div>
@@ -502,7 +501,6 @@
                         <label for="edit_payment_status" class="form-label">Payment Status</label>
                         <select class="form-select" name="payment_status" id="edit_payment_status">
                             <option value="unpaid">Unpaid</option>
-                            <option value="partially_paid">Partially Paid</option>
                             <option value="paid">Paid</option>
                         </select>
                         <div class="form-text">Select the payment status for this bill</div>
@@ -527,7 +525,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add_payment">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addPaymentModalLabel">Add Payment for {{ student.first_name }} {{ student.last_name }} - {{ month_display }}</h5>
+                    <h5 class="modal-title" id="addPaymentModalLabel">Add Payment for {{ student.first_name }} {{ student.last_name }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -596,7 +594,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for bill in bills %}
+                                    {% for bill in all_bills %}
                                     {% if not bill.is_paid or bill.payment_status == 'Partially Paid' %}
                                     <tr class="{% if bill.payment_status == 'Partially Paid' %}table-warning{% endif %}">
                                         <td>
@@ -808,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('edit_date_incurred').value = dateIncurred;
             document.getElementById('edit_late_date').value = lateDate;
             
-            // Set payment status
+            // Set payment status dropdown
             const paymentStatusSelect = document.getElementById('edit_payment_status');
             if (paymentStatusSelect) {
                 paymentStatusSelect.value = paymentStatus;
@@ -1178,6 +1176,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    });
+    
+    // Handle payment status dropdowns
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add bill modal dropdown
+        const paymentStatusSelect = document.getElementById('payment_status');
+        if (paymentStatusSelect) {
+            paymentStatusSelect.addEventListener('change', function() {
+                // No specific action needed here, as the value is set by the form
+            });
+        }
+        
+        // Edit bill modal dropdown
+        const editPaymentStatusSelect = document.getElementById('edit_payment_status');
+        if (editPaymentStatusSelect) {
+            editPaymentStatusSelect.addEventListener('change', function() {
+                // No specific action needed here, as the value is set by the form
+            });
+        }
     });
 });
 </script>

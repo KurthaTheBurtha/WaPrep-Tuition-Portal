@@ -111,12 +111,17 @@
         </div>
     </div>
 
-    <!-- Add Bill Button -->
+    <!-- Add Bill and Payment Buttons -->
     <div class="row mb-4">
         <div class="col-12">
-            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal">
-                <i class="fas fa-plus me-1"></i> Add New Bill
-            </button>
+            <div>
+                <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#addBillModal">
+                    <i class="fas fa-plus me-1"></i> Add New Bill
+                </button>
+                <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+                    <i class="fas fa-credit-card me-1"></i> Add Payment
+                </button>
+            </div>
         </div>
     </div>
 
@@ -281,6 +286,120 @@
                 modal.show();
             }
         };
+
+        // Add Payment Modal functionality
+        // Set default payment date to current date/time
+        const paymentDateInput = document.getElementById('payment_date');
+        if (paymentDateInput) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            paymentDateInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // Handle "Select All" checkbox
+        const selectAllCheckbox = document.getElementById('select_all_bills');
+        const billCheckboxes = document.querySelectorAll('.bill-checkbox');
+        const billAmountInputs = document.querySelectorAll('.bill-amount-input');
+        const totalSelectedSpan = document.getElementById('total_selected');
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                billCheckboxes.forEach((checkbox, index) => {
+                    checkbox.checked = this.checked;
+                    billAmountInputs[index].disabled = !this.checked;
+                });
+                updateTotalSelected();
+            });
+        }
+
+        // Handle individual bill checkboxes
+        billCheckboxes.forEach((checkbox, index) => {
+            checkbox.addEventListener('change', function() {
+                billAmountInputs[index].disabled = !this.checked;
+                updateTotalSelected();
+                updateSelectAllCheckbox();
+            });
+        });
+
+        // Update total selected amount
+        function updateTotalSelected() {
+            let total = 0;
+            billCheckboxes.forEach((checkbox, index) => {
+                if (checkbox.checked) {
+                    const amount = parseFloat(billAmountInputs[index].value) || 0;
+                    total += amount;
+                }
+            });
+            if (totalSelectedSpan) {
+                totalSelectedSpan.textContent = total.toFixed(2);
+            }
+        }
+
+        // Update "Select All" checkbox state
+        function updateSelectAllCheckbox() {
+            const checkedCount = document.querySelectorAll('.bill-checkbox:checked').length;
+            const totalCount = billCheckboxes.length;
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = checkedCount === totalCount && totalCount > 0;
+                selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < totalCount;
+            }
+        }
+
+        // Handle payment form submission
+        const addPaymentForm = document.getElementById('addPaymentForm');
+        const submitPaymentBtn = document.getElementById('submitPaymentBtn');
+        
+        if (addPaymentForm) {
+            addPaymentForm.addEventListener('submit', function(e) {
+                // Validate form
+                const payerId = document.getElementById('payment_payer').value;
+                const amount = document.getElementById('payment_amount').value;
+                const paymentDate = document.getElementById('payment_date').value;
+                
+                if (!payerId || !amount || !paymentDate) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields.');
+                    return false;
+                }
+                
+                // Check if at least one bill is selected
+                const selectedBills = document.querySelectorAll('.bill-checkbox:checked');
+                if (selectedBills.length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one bill to pay.');
+                    return false;
+                }
+                
+                // Validate payment amount is greater than 0
+                const paymentAmount = parseFloat(amount);
+                if (paymentAmount <= 0) {
+                    e.preventDefault();
+                    alert('Payment amount must be greater than $0.');
+                    document.getElementById('payment_amount').focus();
+                    return false;
+                }
+                
+                // Additional validation - ensure amount is reasonable
+                if (paymentAmount > 100000) {
+                    e.preventDefault();
+                    alert('Payment amount exceeds maximum allowed limit of $100,000.');
+                    document.getElementById('payment_amount').focus();
+                    return false;
+                }
+                
+                // Show loading state
+                if (submitPaymentBtn) {
+                    submitPaymentBtn.disabled = true;
+                    submitPaymentBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
+                }
+            });
+        }
+
     });
 </script>
 {% endblock %}
@@ -327,18 +446,143 @@
                         <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_paid" id="is_paid">
-                            <label class="form-check-label" for="is_paid">
-                                Mark as paid
-                            </label>
-                        </div>
+                        <label for="payment_status" class="form-label">Payment Status</label>
+                        <select class="form-select" name="payment_status" id="payment_status">
+                            <option value="unpaid">Unpaid</option>
+                            <option value="paid">Paid</option>
+                        </select>
+                        <div class="form-text">Select the payment status for this bill</div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Add Bill
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Payment Modal -->
+<div class="modal fade" id="addPaymentModal" tabindex="-1" aria-labelledby="addPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" id="addPaymentForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_payment">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addPaymentModalLabel">Add Payment for {{ student.first_name }} {{ student.last_name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_payer" class="form-label">Payer *</label>
+                                <select class="form-select" name="payer_id" id="payment_payer" required>
+                                    <option value="">Select a payer...</option>
+                                    {% for student_payer in student.studentpayer_set.all %}
+                                        <option value="{{ student_payer.payer.id }}">
+                                            {{ student_payer.payer.first_name }} {{ student_payer.payer.last_name }}
+                                            {% if student_payer.is_primary %}(Primary){% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_amount" class="form-label">Payment Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" name="amount" id="payment_amount" min="0.01" required onchange="validatePaymentAmount(this)">
+                                </div>
+                                <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_date" class="form-label">Payment Date *</label>
+                                <input type="datetime-local" class="form-control" name="payment_date" id="payment_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_method" class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method" id="payment_method">
+                                    <option value="manual">Manual</option>
+                                    <option value="check">Check</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="payment_notes" class="form-label">Notes</label>
+                                <textarea class="form-control" name="notes" id="payment_notes" rows="3" placeholder="Optional notes about this payment"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Select Bills to Pay *</label>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Select which bills this payment should cover. For partially paid bills, the amount shown is the remaining balance. The total amount should match the payment amount.
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="select_all_bills"></th>
+                                        <th>Description</th>
+                                        <th>Due Date</th>
+                                        <th>Original Amount</th>
+                                        <th>Amount to Pay</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bill in all_bills %}
+                                    {% if not bill.is_fully_paid %}
+                                    <tr class="{% if bill.payment_status == 'Partially Paid' %}table-warning{% endif %}">
+                                        <td>
+                                            <input type="checkbox" name="bill_ids" value="{{ bill.id }}" class="bill-checkbox" 
+                                                   data-bill-amount="{{ bill.remaining_amount }}" data-bill-description="{{ bill.description }}">
+                                        </td>
+                                        <td>
+                                            {{ bill.description }}
+                                            {% if bill.payment_status == 'Partially Paid' %}
+                                                <span class="badge bg-warning text-dark ms-2">Partially Paid</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ bill.due_date|date:"M d, Y" }}</td>
+                                        <td>
+                                            ${{ bill.amount|floatformat:2 }}
+                                            {% if bill.payment_status == 'Partially Paid' %}
+                                                <br><small class="text-muted">Remaining: ${{ bill.remaining_amount|floatformat:2 }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.01" class="form-control form-control-sm bill-amount-input" 
+                                                   name="bill_amount_{{ bill.id }}" 
+                                                   value="{% if bill.payment_status == 'Partially Paid' %}{{ bill.remaining_amount|floatformat:2 }}{% else %}{{ bill.amount|floatformat:2 }}{% endif %}" 
+                                                   style="width: 100px;" disabled>
+                                            <small class="form-text text-muted">No special characters</small>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <strong>Total Selected: $<span id="total_selected">0.00</span></strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="submitPaymentBtn">
+                        <i class="fas fa-plus me-1"></i> Add Payment
                     </button>
                 </div>
             </form>
