@@ -315,6 +315,23 @@
             paymentDateInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
         }
 
+        // Payment amount validation function
+        window.validatePaymentAmount = function(input) {
+            const value = parseFloat(input.value);
+            if (value <= 0) {
+                input.setCustomValidity('Payment amount must be greater than $0.');
+                input.reportValidity();
+                return false;
+            }
+            if (value > 100000) {
+                input.setCustomValidity('Payment amount exceeds maximum allowed limit of $100,000.');
+                input.reportValidity();
+                return false;
+            }
+            input.setCustomValidity('');
+            return true;
+        };
+
         // Handle payment form submission
         const addPaymentForm = document.getElementById('addPaymentForm');
         const submitPaymentBtn = document.getElementById('submitPaymentBtn');
@@ -481,11 +498,6 @@
                     <hr>
                     
                     <div class="mb-3">
-                        <label class="form-label">Payment Distribution</label>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Payment will be automatically distributed to bills in priority order: Overdue → Current Month → Future. The system will pay the most urgent bills first.
-                        </div>
                         
                         <!-- Payment Breakdown -->
                         <div class="payment-breakdown">
@@ -659,32 +671,11 @@
                                 </div>
                             </div>
 
-                            <!-- Total Summary -->
+                            <!-- Total Due -->
                             <div class="card bg-light">
                                 <div class="card-body">
                                     <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="mb-2">Payment Summary</h6>
-                                            {% if overdue_total > 0 %}
-                                                <div class="d-flex justify-content-between mb-1">
-                                                    <span class="text-danger">Overdue:</span>
-                                                    <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
-                                                </div>
-                                            {% endif %}
-                                            {% if current_month_total > 0 %}
-                                                <div class="d-flex justify-content-between mb-1">
-                                                    <span class="text-warning">Current Month:</span>
-                                                    <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
-                                                </div>
-                                            {% endif %}
-                                            {% if future_total > 0 %}
-                                                <div class="d-flex justify-content-between mb-1">
-                                                    <span class="text-info">Future:</span>
-                                                    <span class="text-info">${{ future_total|floatformat:2 }}</span>
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="col-md-6 text-end">
+                                        <div class="col-12 text-end">
                                             <h5 class="mb-0">Total Due: <strong>${{ total_amount_due|floatformat:2 }}</strong></h5>
                                         </div>
                                     </div>

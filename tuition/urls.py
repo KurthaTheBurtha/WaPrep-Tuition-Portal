@@ -21,6 +21,7 @@ urlpatterns = [
     path('students/update/', views.update_student, name='update_student'),
     path('students/update-notes/', views.update_student_notes, name='update_student_notes'),
     path('payment/<int:student_id>/', views.payment, name='payment'),
+    path('payment/<int:student_id>/form/', views.payment_form, name='payment_form'),
     path('payment/process/', views.process_payment, name='process_payment'),
     path('payment/history/', views.payment_history, name='payment_history'),
     path('payment/receipt/<int:payment_id>/', views.download_receipt, name='download_receipt'),
