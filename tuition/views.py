@@ -2223,18 +2223,17 @@ def student_months(request, student_id):
                 messages.error(request, f'Error adding bill: {str(e)}')
         
         elif action == 'add_payment':
-            # Handle payment addition
+            # Handle payment addition with automatic distribution
             payer_id = request.POST.get('payer_id')
             amount = request.POST.get('amount')
             payment_date = request.POST.get('payment_date')
             payment_method = request.POST.get('payment_method', 'manual')
             notes = request.POST.get('notes', '')
-            bill_ids = request.POST.getlist('bill_ids')
             
             try:
                 # Validate required fields
-                if not payer_id or not amount or not payment_date or not bill_ids:
-                    messages.error(request, 'Please fill in all required fields and select at least one bill.')
+                if not payer_id or not amount or not payment_date:
+                    messages.error(request, 'Please fill in all required fields.')
                     return redirect('student_months', student_id=student_id)
                 
                 # Convert amount to Decimal
@@ -2255,47 +2254,115 @@ def student_months(request, student_id):
                     status='completed'
                 )
                 
-                # Process bill payments
+                # Get all unpaid bills and categorize them by priority (same logic as payer side)
+                from datetime import datetime, timedelta
+                
+                today = timezone.now().date()
+                current_date = datetime.now()
+                current_month = current_date.month
+                current_year = current_date.year
+                
+                # Calculate the last day of the current month
+                last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+                end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+                
+                # Get all unpaid bills
+                all_unpaid_bills = PaymentBreakdown.objects.filter(
+                    student=student,
+                    is_paid=False
+                ).order_by('due_date')
+                
+                # Categorize bills by priority
+                overdue_bills = []
+                current_month_bills = []
+                future_bills = []
+                
+                for bill in all_unpaid_bills:
+                    if bill.late_date and bill.late_date < today:
+                        overdue_bills.append(bill)
+                    elif bill.due_date <= end_of_month:
+                        current_month_bills.append(bill)
+                    else:
+                        future_bills.append(bill)
+                
+                # Apply payment in priority order: overdue -> current month -> future
                 remaining_amount = payment_amount
                 bills_to_update = []
                 
-                for bill_id in bill_ids:
+                # Process overdue bills first
+                for bill in overdue_bills:
                     if remaining_amount <= 0:
                         break
                     
-                    try:
-                        bill = PaymentBreakdown.objects.get(id=bill_id, student=student)
-                        bill_amount_key = f'bill_amount_{bill_id}'
-                        bill_amount = Decimal(request.POST.get(bill_amount_key, str(bill.remaining_amount)))
-                        
-                        # Ensure we don't pay more than the remaining amount or the payment amount
-                        bill_amount = min(bill_amount, bill.remaining_amount, remaining_amount)
-                        
-                        if bill_amount > 0:
-                            # Create PaymentItem record
-                            PaymentItem.objects.create(
-                                payment=payment,
-                                breakdown_item=bill,
-                                amount_paid=bill_amount,
-                                currency='USD'
-                            )
-                            
-                            # Update bill status
-                            if bill_amount >= bill.remaining_amount:
-                                bill.is_paid = True
-                                bill.payment_status_override = 'paid'
-                            
-                            bills_to_update.append(bill)
-                            remaining_amount -= bill_amount
+                    bill_remaining = Decimal(str(bill.remaining_amount))
+                    bill_amount = min(remaining_amount, bill_remaining)
                     
-                    except PaymentBreakdown.DoesNotExist:
-                        continue
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
+                    )
+                    
+                    # Check if bill is now fully paid
+                    if bill_amount >= bill_remaining:
+                        bill.is_paid = True
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
+                
+                # Process current month bills
+                for bill in current_month_bills:
+                    if remaining_amount <= 0:
+                        break
+                    
+                    bill_remaining = Decimal(str(bill.remaining_amount))
+                    bill_amount = min(remaining_amount, bill_remaining)
+                    
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
+                    )
+                    
+                    # Check if bill is now fully paid
+                    if bill_amount >= bill_remaining:
+                        bill.is_paid = True
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
+                
+                # Process future bills
+                for bill in future_bills:
+                    if remaining_amount <= 0:
+                        break
+                    
+                    bill_remaining = Decimal(str(bill.remaining_amount))
+                    bill_amount = min(remaining_amount, bill_remaining)
+                    
+                    # Create PaymentItem record
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        breakdown_item=bill,
+                        amount_paid=bill_amount,
+                        currency='USD'  # Default to USD
+                    )
+                    
+                    # Check if bill is now fully paid
+                    if bill_amount >= bill_remaining:
+                        bill.is_paid = True
+                    
+                    bills_to_update.append(bill)
+                    remaining_amount -= bill_amount
                 
                 # Save all updated bills
                 for bill in bills_to_update:
                     bill.save()
                 
-                messages.success(request, f'Payment of ${amount} added successfully for {payer.first_name} {payer.last_name}.')
+                messages.success(request, f'Payment of ${amount} added successfully for {payer.first_name} {payer.last_name}. Payment was automatically distributed to bills in priority order.')
                 
             except User.DoesNotExist:
                 messages.error(request, 'Selected payer not found.')
@@ -2409,6 +2476,40 @@ def student_months(request, student_id):
         user_type='payer'
     ).order_by('first_name', 'last_name')
     
+    # Categorize bills for payment distribution (similar to payer side)
+    from datetime import datetime, timedelta
+    
+    today = timezone.now().date()
+    current_date = datetime.now()
+    current_month = current_date.month
+    current_year = current_date.year
+    
+    # Calculate the last day of the current month
+    last_day_of_month = calendar.monthrange(current_year, current_month)[1]
+    end_of_month = datetime(current_year, current_month, last_day_of_month).date()
+    
+    # Get all unpaid bills
+    unpaid_bills = [bill for bill in all_bills if not bill.is_fully_paid]
+    
+    # Categorize bills by priority
+    overdue_items = []
+    current_month_items = []
+    future_items = []
+    
+    for bill in unpaid_bills:
+        if bill.late_date and bill.late_date < today:
+            overdue_items.append(bill)
+        elif bill.due_date <= end_of_month:
+            current_month_items.append(bill)
+        else:
+            future_items.append(bill)
+    
+    # Calculate totals for each category
+    overdue_total = sum(bill.remaining_amount for bill in overdue_items)
+    current_month_total = sum(bill.remaining_amount for bill in current_month_items)
+    future_total = sum(bill.remaining_amount for bill in future_items)
+    total_amount_due = overdue_total + current_month_total + future_total
+    
     context = {
         'student': student,
         'monthly_billing': sorted_months,
@@ -2420,6 +2521,14 @@ def student_months(request, student_id):
         'unpaid_bills': unpaid_bills,
         'paid_amount': paid_amount,
         'unpaid_amount': unpaid_amount,
+        # Add categorized bill data for payment modal
+        'overdue_items': overdue_items,
+        'current_month_items': current_month_items,
+        'future_items': future_items,
+        'overdue_total': overdue_total,
+        'current_month_total': current_month_total,
+        'future_total': future_total,
+        'total_amount_due': total_amount_due,
     }
     return render(request, 'student_months.html', context)
 
