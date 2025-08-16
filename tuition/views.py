@@ -16,13 +16,7 @@ from .forms import AccountRequestForm
 from django.conf import settings
 from django.db.models import Sum
 from decouple import config
-from .bill_api import (
-    get_session_id,
-    create_vendor,
-    create_bank_account,
-    create_bill,
-    pay_bill
-)
+
 import stripe
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -2831,18 +2825,7 @@ Message:
     # Return to payer_dashboard.html or a dedicated ask_question.html
     return render(request, 'payer_dashboard.html', {'form': form})
 
-def add_vendor_view(request):
-    if request.method == 'POST':
-        vendor_data = {
-            "name": request.POST['name'],
-            "email": request.POST['email']
-        }
-        session_id = get_session_id()
-        result = create_vendor(session_id, vendor_data)
-        # Save to your local DB if needed
-        return redirect('success_page')
 
-    return render(request, 'add_vendor.html')
 
 @login_required
 def add_bank_account(request):
