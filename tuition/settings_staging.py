@@ -1,9 +1,14 @@
 # settings.py
-import dj_database_url
-
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+
+# Add error handling for imports
+try:
+    import dj_database_url
+except (ImportError, TypeError):
+    print("Warning: dj-database-url not available or incompatible version")
+    dj_database_url = None
 
 # BASE DIRECTORY
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -63,13 +68,38 @@ TEMPLATES = [
 # WSGI APPLICATION
 WSGI_APPLICATION = 'tuition.wsgi.application'
 
-# # DATABASE
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
+# DATABASE - Use PostgreSQL in staging
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL and dj_database_url:
+    try:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+        print(f"Using PostgreSQL database: {DATABASES['default']['ENGINE']}")
+    except Exception as e:
+        print(f"Error configuring PostgreSQL: {e}")
+        # Fallback to SQLite
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+        print("Using SQLite database (fallback)")
+else:
+    # Fallback to SQLite for testing
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+    print("Using SQLite database (fallback)")
 
 # PASSWORD VALIDATION
 AUTH_PASSWORD_VALIDATORS = [
@@ -119,11 +149,10 @@ LOGIN_URL = '/login/payer/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/data/db.sqlite3',  # <-- Safe path
-    }
-}
+# STRIPE SETTINGS
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+
+# Database configuration is handled above
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
