@@ -2854,10 +2854,10 @@ def add_payment_method(request):
     stripe_publishable_key = settings.STRIPE_PUBLISHABLE_KEY
     # Get or create Stripe customer
     customer_id = get_or_create_stripe_customer(request.user)
-    # Create a SetupIntent for this customer with support for both cards and bank accounts
+    # Create a SetupIntent for this customer with support for bank accounts only
     setup_intent = stripe.SetupIntent.create(
         customer=customer_id,
-        payment_method_types=['card', 'us_bank_account'],
+        payment_method_types=['us_bank_account'],
         usage='off_session'  # Allow future payments
     )
     client_secret = setup_intent.client_secret
@@ -3595,32 +3595,15 @@ def manage_payment_methods(request):
     # Get or create Stripe customer
     customer_id = get_or_create_stripe_customer(request.user)
     
-    # Get saved payment methods from Stripe
+    # Get saved payment methods from Stripe (bank accounts only)
     try:
-        payment_methods = stripe.PaymentMethod.list(
-            customer=customer_id,
-            type='card'
-        )
-        
         bank_accounts = stripe.PaymentMethod.list(
             customer=customer_id,
             type='us_bank_account'
         )
         
-        # Combine and sort by creation date
+        # Process bank accounts
         all_payment_methods = []
-        
-        for pm in payment_methods.data:
-            all_payment_methods.append({
-                'id': pm.id,
-                'type': 'card',
-                'brand': pm.card.brand.title(),
-                'last4': pm.card.last4,
-                'exp_month': pm.card.exp_month,
-                'exp_year': pm.card.exp_year,
-                'created': pm.created,
-                'status': 'active'
-            })
         
         for pm in bank_accounts.data:
             all_payment_methods.append({
@@ -3641,13 +3624,11 @@ def manage_payment_methods(request):
         all_payment_methods = []
     
     # Get local database records for comparison
-    local_cards = Card.objects.filter(user=request.user)
     local_bank_accounts = BankAccount.objects.filter(user=request.user)
     
     context = {
         'payment_methods': all_payment_methods,
-        'local_cards': local_cards,
-        'local_bank_accounts': local_bank_accounts,
+        'saved_bank_accounts': local_bank_accounts,
         'STRIPE_PUBLISHABLE_KEY': settings.STRIPE_PUBLISHABLE_KEY,
     }
     return render(request, 'manage_payment_methods.html', context)

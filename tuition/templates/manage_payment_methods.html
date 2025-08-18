@@ -13,48 +13,7 @@
                     </a>
                 </div>
                 <div class="card-body">
-                    <!-- Credit/Debit Cards -->
-                    {% if saved_cards %}
-                    <div class="mb-4">
-                        <h5><i class="fas fa-credit-card text-primary"></i> Credit/Debit Cards</h5>
-                        <div class="row">
-                            {% for card in saved_cards %}
-                            <div class="col-md-6 mb-3">
-                                <div class="card border-primary">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <h6 class="card-title mb-1">{{ card.nickname }}</h6>
-                                                <p class="text-muted mb-1">
-                                                    <i class="fas fa-credit-card"></i>
-                                                    {{ card.brand }} ****{{ card.last4 }}
-                                                </p>
-                                                <small class="text-muted">
-                                                    Expires {{ card.exp_month }}/{{ card.exp_year }}
-                                                </small>
-                                            </div>
-                                            <div class="dropdown">
-                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
-                                                        type="button" data-bs-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li>
-                                                        <a class="dropdown-item" href="#" 
-                                                           onclick="deletePaymentMethod('card', {{ card.id }}, '{{ card.nickname }}')">
-                                                            <i class="fas fa-trash text-danger"></i> Remove
-                                                        </a>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
+
 
                     <!-- Bank Accounts -->
                     {% if saved_bank_accounts %}
@@ -100,11 +59,11 @@
                     {% endif %}
 
                     <!-- No Payment Methods -->
-                    {% if not saved_cards and not saved_bank_accounts %}
+                    {% if not saved_bank_accounts %}
                     <div class="text-center py-5">
-                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <i class="fas fa-university fa-3x text-muted mb-3"></i>
                         <h5 class="text-muted">No payment methods added yet</h5>
-                        <p class="text-muted">Add a payment method to make secure payments</p>
+                        <p class="text-muted">Add a bank account to make secure payments</p>
                         <a href="{% url 'add_payment_method' %}" class="btn btn-primary">
                             <i class="fas fa-plus"></i> Add Your First Payment Method
                         </a>
@@ -121,9 +80,6 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a href="{% url 'add_payment_method' %}" class="btn btn-outline-primary">
-                            <i class="fas fa-credit-card"></i> Add Credit/Debit Card
-                        </a>
                         <a href="{% url 'add_payment_method' %}" class="btn btn-outline-success">
                             <i class="fas fa-university"></i> Add Bank Account
                         </a>
@@ -140,7 +96,6 @@
                     
                     <h6>Payment Processing</h6>
                     <div class="small">
-                        <p><strong>Credit/Debit Cards:</strong> Processed immediately</p>
                         <p><strong>Bank Accounts (ACH):</strong> Typically 3-5 business days</p>
                     </div>
                 </div>

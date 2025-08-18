@@ -10,7 +10,7 @@
         <div class="card-body">
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i>
-                <strong>Secure Payment Method Addition:</strong> You can add credit/debit cards or US bank accounts. 
+                <strong>Secure Payment Method Addition:</strong> You can add US bank accounts only. 
                 All payment information is securely handled by Stripe.
             </div>
 
@@ -67,14 +67,14 @@ let elements;
 async function initialize() {
     elements = stripe.elements(options);
     
-    // Create Payment Element with enhanced options for bank accounts
+    // Create Payment Element with bank accounts only
     const paymentElement = elements.create('payment', {
         layout: {
             type: 'tabs',
             defaultCollapsed: false,
             spacedAccordionItems: false
         },
-        paymentMethodOrder: ['card', 'us_bank_account']
+        paymentMethodOrder: ['us_bank_account']
     });
     
     paymentElement.mount('#payment-element');
