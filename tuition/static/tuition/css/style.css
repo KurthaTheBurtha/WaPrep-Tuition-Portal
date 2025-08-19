@@ -74,4 +74,24 @@ footer {
     width: 100%;
     height: 200px;
     object-fit: cover;
+}
+
+/* Override Bootstrap warning colors for better legibility */
+.text-warning {
+    color: #fd7e14 !important;
+}
+
+.bg-warning {
+    background-color: #fd7e14 !important;
+    color: white !important;
+}
+
+.alert-warning {
+    background-color: #fff3e0 !important;
+    border-color: #fd7e14 !important;
+    color: #e65100 !important;
+}
+
+.progress-bar.bg-warning {
+    background-color: #fd7e14 !important;
 } 

@@ -419,14 +419,6 @@
                         <input type="date" name="late_date" id="late_date" class="form-control">
                         <div class="form-text">Leave blank to use last day of the month</div>
                     </div>
-                    <div class="mb-3">
-                        <label for="payment_status" class="form-label">Payment Status</label>
-                        <select class="form-select" name="payment_status" id="payment_status">
-                            <option value="unpaid">Unpaid</option>
-                            <option value="paid">Paid</option>
-                        </select>
-                        <div class="form-text">Select the payment status for this bill</div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -482,10 +474,11 @@
                             <div class="mb-3">
                                 <label for="payment_method" class="form-label">Payment Method</label>
                                 <select class="form-select" name="payment_method" id="payment_method">
-                                    <option value="manual">Manual</option>
+                                    <option value="credit_debit">Credit/Debit</option>
                                     <option value="check">Check</option>
                                     <option value="cash">Cash</option>
                                     <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="other">Other</option>
                                 </select>
                             </div>
                             <div class="mb-3">
