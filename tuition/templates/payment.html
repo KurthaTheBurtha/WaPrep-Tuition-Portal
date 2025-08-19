@@ -4,9 +4,6 @@
 {% block content %}
 <div class="container mt-4">
     <div class="card">
-        <div class="card-header">
-            <h4 class="mb-0">Payment Breakdown</h4>
-        </div>
         <div class="card-body">
 
             <!-- Payment Amount Selector -->
@@ -60,7 +57,7 @@
             </div>
 
             <div class="payment-breakdown mb-4">
-                <h5>Payment Breakdown</h5>
+                <h4>Payment Breakdown</h4>
                 
                 <!-- Overdue Items Accordion -->
                 <div class="accordion mb-3" id="overdueAccordion">
@@ -310,8 +307,8 @@
 }
 
 .current-box {
-    background-color: #fff3cd;
-    border-color: #ffc107;
+    background-color: #fff3e0;
+    border-color: #fd7e14;
 }
 
 .future-box {
@@ -799,10 +796,10 @@ function previewPayment() {
                         <strong>Total Payment:</strong><br>
                         <span class="text-success">$${totalPaid.toFixed(2)}</span>
                     </div>
-                    <div class="col-md-3">
-                        <strong>Remaining Balance:</strong><br>
-                        <span class="text-warning">$${totalRemaining.toFixed(2)}</span>
-                    </div>
+                                         <div class="col-md-3">
+                         <strong>Remaining Balance:</strong><br>
+                         <span class="text-danger">$${totalRemaining.toFixed(2)}</span>
+                     </div>
                     <div class="col-md-3">
                         <strong>Bills Fully Paid:</strong><br>
                         <span class="text-info">${fullyPaidCount}</span>
