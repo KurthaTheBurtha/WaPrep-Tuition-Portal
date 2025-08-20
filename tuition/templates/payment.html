@@ -4,64 +4,52 @@
 {% block content %}
 <div class="container mt-4">
     <div class="card">
-        <div class="card-header">
-            <h4 class="mb-0">{{ payment_description }}</h4>
-        </div>
         <div class="card-body">
 
-
-            <!-- No Fees Information Box -->
-            <div class="no-fees-info mb-4">
-                <div class="accordion" id="feesAccordion">
-                    <div class="accordion-item border-success">
-                        <h2 class="accordion-header" id="feesHeading">
-                            <button class="accordion-button collapsed bg-success text-white" type="button" data-bs-toggle="collapse" data-bs-target="#feesCollapse" aria-expanded="false" aria-controls="feesCollapse">
-                                <i class="fas fa-check-circle me-2"></i>Payment Processing Information
-                            </button>
-                        </h2>
-                        <div id="feesCollapse" class="accordion-collapse collapse" aria-labelledby="feesHeading" data-bs-parent="#feesAccordion">
-                            <div class="accordion-body">
-                                <div class="card border-success">
-                                    <div class="card-body">
-                                        <div class="row align-items-center">
-                                            <div class="col-md-8">
-                                                <div class="fee-info mb-2">
-                                                    <h6 class="text-success mb-2">
-                                                        <i class="fas fa-check-circle me-1"></i>We Cover All Processing Fees
-                                                    </h6>
-                                                    <p class="mb-2">
-                                                        Washington Preparatory School covers all payment processing fees, ensuring you pay exactly the amount due with no additional charges. We believe in transparent, straightforward billing for the families.
-                                                    </p>
-                                                    <div class="fee-benefits">
-                                                        <div class="benefit-item d-flex align-items-center mb-1">
-                                                            <i class="fas fa-check text-success me-2"></i>
-                                                            <span class="small">No processing fees added to your payment</span>
-                                                        </div>
-                                                        <div class="benefit-item d-flex align-items-center mb-1">
-                                                            <i class="fas fa-university text-success me-2"></i>
-                                                            <span class="small">Bank account payments preferred (reduces the costs)</span>
-                                                        </div>
-                                                        <div class="benefit-item d-flex align-items-center">
-                                                            <i class="fas fa-handshake text-success me-2"></i>
-                                                            <span class="small">Helps us maintain affordable tuition rates</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="savings-section text-center">
-                                                    <div class="savings-icon mb-2">
-                                                        <i class="fas fa-chart-line fa-lg text-success"></i>
-                                                    </div>
-                                                    <h6 class="text-success mb-1">Cost Efficiency</h6>
-                                                    <p class="small text-muted mb-0">
-                                                        Bank account payments reduce the processing costs by approximately 70%, allowing us to invest more in your child's education.
-                                                    </p>
-                                                </div>
-                                            </div>
+            <!-- Payment Amount Selector -->
+            <div class="payment-amount-selector mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-dollar-sign me-2"></i>Payment Amount
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <div class="payment-input-container">
+                                        <div class="payment-input-text">
+                                            Enter the amount you want to pay (maximum ${{ total_amount_due|floatformat:2 }})
+                                        </div>
+                                                                                <div class="payment-input-field">
+                                            <span class="currency-symbol">$</span>
+                                            <input type="number" 
+                                                   class="form-control payment-amount-input" 
+                                                   id="payment_amount" 
+                                                   name="payment_amount" 
+                                                   step="0.01" 
+                                                   min="0.01" 
+                                                   max="{{ total_amount_due }}" 
+                                                   value="{% if default_payment_amount %}{{ default_payment_amount|floatformat:2 }}{% else %}0.00{% endif %}"
+                                                   required
+                                                   onchange="validatePaymentAmount(this)"
+                                                   oninput="updateHiddenAmount(this)"
+                                                   placeholder="0.00">
+                                            <button type="button" class="btn btn-primary ms-2" id="preview-payment-btn" onclick="previewPayment()">
+                                                <i class="fas fa-eye me-1"></i>Preview Payment
+                                            </button>
+                                        </div>
+                                        <div class="payment-input-description">
+                                            The system will automatically apply this amount to your bills in order of late date.
+                                        </div>
+                                        <div class="payment-input-note">
+                                            Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)
                                         </div>
                                     </div>
                                 </div>
+                                
+
                             </div>
                         </div>
                     </div>
@@ -69,7 +57,7 @@
             </div>
 
             <div class="payment-breakdown mb-4">
-                <h5>Payment Breakdown</h5>
+                <h4>Payment Breakdown</h4>
                 
                 <!-- Overdue Items Accordion -->
                 <div class="accordion mb-3" id="overdueAccordion">
@@ -92,6 +80,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
+                                                    <th>Late Date</th>
                                                     <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
@@ -100,13 +89,14 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
                                                     <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td colspan="2" class="text-end"><strong>Overdue Total:</strong></td>
+                                                    <td colspan="3" class="text-end"><strong>Overdue Total:</strong></td>
                                                     <td class="text-end"><strong>${{ overdue_total|floatformat:2 }}</strong></td>
                                                 </tr>
                                             </tfoot>
@@ -146,6 +136,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
+                                                    <th>Late Date</th>
                                                     <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
@@ -154,13 +145,14 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
                                                     <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td colspan="2" class="text-end"><strong>Current Month Total:</strong></td>
+                                                    <td colspan="3" class="text-end"><strong>Current Month Total:</strong></td>
                                                     <td class="text-end"><strong>${{ current_month_total|floatformat:2 }}</strong></td>
                                                 </tr>
                                             </tfoot>
@@ -200,6 +192,7 @@
                                                 <tr>
                                                     <th>Description</th>
                                                     <th>Due Date</th>
+                                                    <th>Late Date</th>
                                                     <th class="text-end">Unpaid Amount</th>
                                                 </tr>
                                             </thead>
@@ -208,13 +201,14 @@
                                                 <tr>
                                                     <td>{{ item.description }}</td>
                                                     <td>{{ item.due_date|date:"M d, Y" }}</td>
+                                                    <td>{{ item.late_date|date:"M d, Y"|default:"-" }}</td>
                                                     <td class="text-end">${{ item.remaining_amount|floatformat:2 }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td colspan="2" class="text-end"><strong>Future Total:</strong></td>
+                                                    <td colspan="3" class="text-end"><strong>Future Total:</strong></td>
                                                     <td class="text-end"><strong>${{ future_total|floatformat:2 }}</strong></td>
                                                 </tr>
                                             </tfoot>
@@ -233,32 +227,11 @@
                     </div>
                 </div>
 
-                <!-- Total Summary -->
+                <!-- Total Due -->
                 <div class="card bg-light">
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
-                                <h6 class="mb-2">Payment Summary</h6>
-                                {% if overdue_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box overdue-box">
-                                        <span class="text-danger">Overdue:</span>
-                                        <span class="text-danger">${{ overdue_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                                {% if current_month_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box current-box">
-                                        <span class="text-warning">Current Month:</span>
-                                        <span class="text-warning">${{ current_month_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                                {% if future_total > 0 %}
-                                    <div class="d-flex justify-content-between mb-1 amount-box future-box">
-                                        <span class="text-info">Future:</span>
-                                        <span class="text-info">${{ future_total|floatformat:2 }}</span>
-                                    </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6 text-end">
+                            <div class="col-12 text-end">
                                 <h5 class="mb-0">Total Due: <strong>${{ total_amount_due|floatformat:2 }}</strong></h5>
                             </div>
                         </div>
@@ -266,126 +239,10 @@
                 </div>
             </div>
 
-            <!-- Payment Amount Selector -->
-            <div class="payment-amount-selector mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-dollar-sign me-2"></i>Payment Amount
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="mb-3">
-                                    <label for="payment_amount" class="form-label">How much would you like to pay?</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" 
-                                               class="form-control" 
-                                               id="payment_amount" 
-                                               name="payment_amount" 
-                                               step="0.01" 
-                                               min="0.01" 
-                                               max="{{ total_amount_due }}" 
-                                               value="{{ total_amount_due }}"
-                                               required
-                                               onchange="validatePaymentAmount(this)"
-                                               oninput="updateHiddenAmount(this)">
-                                    </div>
-                                    <div class="form-text">
-                                        Enter the amount you want to pay (maximum ${{ total_amount_due|floatformat:2 }}). The system will automatically apply it to your bills in order of urgency.
-                                    </div>
-                                    <div class="form-text text-muted">Do not use commas or other special characters when entering amounts (e.g., use 1500.00 instead of 1,500.00)</div>
-                                </div>
-                                
-                                <!-- Quick Amount Buttons -->
-                                <div class="mb-3">
-                                    <label class="form-label">Quick Amount Options:</label>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        {% if overdue_total > 0 %}
-                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="setPaymentAmount({{ overdue_total }})">
-                                                Pay Overdue Only (${{ overdue_total|floatformat:2 }})
-                                            </button>
-                                        {% endif %}
-                                        {% if current_month_total > 0 %}
-                                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="setPaymentAmount({{ current_month_total }})">
-                                                Pay Current Month (${{ current_month_total|floatformat:2 }})
-                                            </button>
-                                        {% endif %}
-                                        {% if overdue_total > 0 and current_month_total > 0 %}
-                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setPaymentAmount({{ overdue_total|add:current_month_total }})">
-                                                Pay Overdue + Current (${{ overdue_total|add:current_month_total|floatformat:2 }})
-                                            </button>
-                                        {% endif %}
-                                        <button type="button" class="btn btn-outline-success btn-sm" onclick="setPaymentAmount({{ total_amount_due }})">
-                                            Pay All (${{ total_amount_due|floatformat:2 }})
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Secure Payment Information -->
-            <div class="payment-info mb-4">
-                <div class="accordion" id="securityAccordion">
-                    <div class="accordion-item border-primary">
-                        <h2 class="accordion-header" id="securityHeading">
-                            <button class="accordion-button collapsed bg-primary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#securityCollapse" aria-expanded="false" aria-controls="securityCollapse">
-                                <i class="fas fa-shield-alt me-2"></i>Secure Payment Processing
-                            </button>
-                        </h2>
-                        <div id="securityCollapse" class="accordion-collapse collapse" aria-labelledby="securityHeading" data-bs-parent="#securityAccordion">
-                            <div class="accordion-body">
-                                <div class="card border-primary">
-                                    <div class="card-body">
-                                        <div class="security-info">
-                                            <h6 class="text-primary mb-2">
-                                                <i class="fas fa-lock me-1"></i>Secure Payment Processing
-                                            </h6>
-                                            <p class="mb-2 small">
-                                                You can pay with credit/debit cards or US bank accounts. 
-                                                All payment information is securely handled by Stripe, 
-                                                a PCI Service Provider Level 1 certified payment processor.
-                                            </p>
-                                            <div class="security-features">
-                                                <span class="badge bg-success me-1 mb-1">
-                                                    <i class="fas fa-check me-1"></i>Encrypted
-                                                </span>
-                                                <span class="badge bg-success me-1 mb-1">
-                                                    <i class="fas fa-check me-1"></i>PCI Compliant
-                                                </span>
-                                                <span class="badge bg-success me-1 mb-1">
-                                                    <i class="fas fa-check me-1"></i>Secure
-                                                </span>
-                                            </div>
-                                            <div class="privacy-link mt-2">
-                                                <small class="text-muted">
-                                                    <i class="fas fa-shield-alt me-1"></i>
-                                                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                                                        View Stripe's Privacy Policy
-                                                    </a>
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {% if breakdown_items and STRIPE_CLIENT_SECRET %}
+            {% if breakdown_items %}
             
-            <form id="stripe-payment-form" method="post" action="{% url 'process_payment' %}">
-                {% csrf_token %}
-                <input type="hidden" name="student_id" value="{{ student_id }}">
-                <input type="hidden" name="amount" id="amount_input" value="{{ total_amount_due }}">
-                <input type="hidden" name="payment_intent_id" id="payment_intent_id">
+            <form id="payment-breakdown-form" method="get" action="{% url 'payment_form' student_id %}">
+                <input type="hidden" name="amount" id="amount_input" value="{% if default_payment_amount %}{{ default_payment_amount|floatformat:2 }}{% else %}0.00{% endif %}">
                 {% if bill_id %}
                 <input type="hidden" name="bill_id" value="{{ bill_id }}">
                 {% endif %}
@@ -399,13 +256,6 @@
                 <input type="hidden" name="all_bills" value="{{ all_bills_param }}">
                 {% endif %}
                 
-                <div class="mb-3">
-                    <div id="payment-element" class="form-control"></div>
-                    <div class="form-text">
-                        <i class="fas fa-shield-alt"></i> Your payment information is encrypted and secure
-                    </div>
-                </div>
-                
                 {% if messages %}
                 <div class="mb-3">
                     {% for message in messages %}
@@ -418,8 +268,8 @@
                 {% endif %}
                 
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary" id="submit-btn">
-                        <i class="fas fa-credit-card"></i> Pay Now
+                    <button type="submit" class="btn btn-primary" id="next-btn">
+                        <i class="fas fa-arrow-right"></i> Next
                     </button>
                     <a href="{% url 'payer_dashboard' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-times"></i> Cancel
@@ -431,117 +281,9 @@
     </div>
 </div>
 
+
+
 <style>
-/* No fees information box styling */
-.no-fees-info .card {
-    border-radius: 0.5rem;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    transition: all 0.2s ease-in-out;
-    border: 2px solid #198754;
-}
-
-.no-fees-info .card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-}
-
-.no-fees-info .card-header {
-    border-radius: 0.5rem 0.5rem 0 0 !important;
-    border-bottom: none;
-    padding: 0.75rem 1rem;
-    background: linear-gradient(135deg, #198754 0%, #146c43 100%) !important;
-}
-
-.no-fees-info .card-body {
-    padding: 1rem;
-}
-
-.fee-info p {
-    font-size: 0.9rem;
-    color: #495057;
-    line-height: 1.5;
-}
-
-.fee-benefits .benefit-item {
-    padding: 0.25rem 0;
-}
-
-.fee-benefits .benefit-item i {
-    width: 18px;
-    text-align: center;
-}
-
-.fee-benefits .small {
-    font-size: 0.85rem;
-    color: #495057;
-    line-height: 1.3;
-}
-
-.savings-section .savings-icon {
-    color: #198754;
-}
-
-.savings-section .small {
-    font-size: 0.8rem;
-    color: #6c757d;
-    line-height: 1.4;
-}
-
-/* Combined payment information styling */
-.payment-info .card {
-    border-radius: 0.75rem;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    transition: all 0.2s ease-in-out;
-    border: 2px solid #007bff;
-}
-
-.payment-info .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-}
-
-.payment-info .card-header {
-    border-radius: 0.75rem 0.75rem 0 0 !important;
-    border-bottom: none;
-    padding: 1rem;
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
-}
-
-.payment-info .card-body {
-    padding: 1rem;
-}
-
-.security-info .small {
-    font-size: 0.875rem;
-    color: #495057;
-}
-
-.security-features .badge {
-    font-size: 0.7rem;
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.4rem;
-}
-
-
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .no-fees-info .col-md-4 {
-        margin-top: 1rem;
-    }
-    
-    .no-fees-info .card {
-        margin-bottom: 1rem;
-    }
-    
-    .payment-info .col-md-4 {
-        margin-top: 1rem;
-    }
-    
-    .payment-info .card {
-        margin-bottom: 1rem;
-    }
-}
 
 /* Payment summary enhancements */
 .payment-summary {
@@ -565,8 +307,8 @@
 }
 
 .current-box {
-    background-color: #fff3cd;
-    border-color: #ffc107;
+    background-color: #fff3e0;
+    border-color: #fd7e14;
 }
 
 .future-box {
@@ -614,151 +356,163 @@
     border: none;
 }
 
-.btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.3);
-}
+ .btn-primary:hover {
+     transform: translateY(-1px);
+     box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.3);
+ }
+
+ /* Payment Input Styling */
+ .payment-input-container {
+     background: #f8f9fa;
+     border: 1px solid #dee2e6;
+     border-radius: 0.5rem;
+     padding: 1rem;
+     margin-bottom: 1rem;
+ }
+
+ .payment-input-text {
+     font-size: 0.9rem;
+     color: #495057;
+     margin-bottom: 0.5rem;
+     font-weight: 500;
+ }
+
+ .payment-input-field {
+     display: flex;
+     align-items: center;
+     background: white;
+     border: 2px solid #e9ecef;
+     border-radius: 0.375rem;
+     padding: 0.5rem 0.75rem;
+     margin-bottom: 0.5rem;
+     transition: all 0.2s ease-in-out;
+ }
+
+ .payment-input-field:focus-within {
+     border-color: #007bff;
+     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+ }
+
+ .currency-symbol {
+     font-weight: 600;
+     color: #495057;
+     margin-right: 0.5rem;
+     font-size: 1rem;
+ }
+
+ .payment-amount-input {
+     border: none !important;
+     box-shadow: none !important;
+     background: transparent !important;
+     padding: 0 !important;
+     margin: 0 !important;
+     font-size: 1rem;
+     font-weight: 500;
+     color: #495057;
+     flex: 1;
+ }
+
+ .payment-amount-input:focus {
+     border: none !important;
+     box-shadow: none !important;
+     background: transparent !important;
+ }
+
+ .payment-input-description {
+     font-size: 0.85rem;
+     color: #6c757d;
+     margin-bottom: 0.25rem;
+     font-style: italic;
+ }
+
+ .payment-input-note {
+     font-size: 0.8rem;
+     color: #6c757d;
+     font-style: italic;
+ }
+
+/* Preview Payment Button Styling */
+#preview-payment-btn {
+     white-space: nowrap;
+     font-size: 0.9rem;
+     padding: 0.5rem 0.75rem;
+     margin-left: 0.5rem;
+     border-radius: 0.375rem;
+     background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+     border: none;
+     transition: all 0.2s ease-in-out;
+ }
+
+ #preview-payment-btn:hover {
+     transform: translateY(-1px);
+     box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.3);
+     background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+ }
+
+/* Modal Preview Styling */
+#previewPaymentModal .modal-dialog {
+     max-width: 900px;
+ }
+
+ #previewPaymentModal .table th {
+     font-size: 0.85rem;
+     font-weight: 600;
+ }
+
+ #previewPaymentModal .table td {
+     font-size: 0.85rem;
+     vertical-align: middle;
+ }
+
+ #previewPaymentModal .card-header {
+     font-size: 0.9rem;
+     font-weight: 600;
+ }
+
+/* Ensure modal displays properly */
+.modal.show {
+     display: block !important;
+     background-color: rgba(0, 0, 0, 0.5);
+ }
+
+.modal-backdrop.show {
+     opacity: 0.5;
+ }
+
+ /* Fix modal z-index issues */
+ .modal {
+      z-index: 1055 !important;
+  }
+ 
+ .modal-backdrop {
+      z-index: 1050 !important;
+  }
+ 
+ /* Additional modal fixes */
+ .modal.show {
+      display: block !important;
+      background-color: rgba(0, 0, 0, 0.5) !important;
+  }
+ 
+ .modal-dialog {
+      margin: 1.75rem auto !important;
+  }
+ 
+ /* Ensure modal content is visible */
+ .modal-content {
+      position: relative;
+      z-index: 1056 !important;
+      background-color: white !important;
+  }
+ 
+ /* Modal backdrop styling */
+ .modal-backdrop.show {
+      opacity: 0.5 !important;
+      background-color: rgba(0, 0, 0, 0.5) !important;
+  }
 </style>
 
 <script>
-const stripe = Stripe("{{ STRIPE_PUBLISHABLE_KEY|default:'' }}");
-const options = {
-    clientSecret: "{{ STRIPE_CLIENT_SECRET|default:'' }}",
-    appearance: {
-        theme: 'stripe',
-        variables: {
-            colorPrimary: '#0d6efd',
-        }
-    },
-    loader: 'always'
-};
-let elements;
-
-async function initialize() {
-    elements = stripe.elements(options);
-    const paymentElement = elements.create('payment', {
-        layout: {
-            type: 'tabs',
-            defaultCollapsed: false,
-            spacedAccordionItems: false
-        },
-        paymentMethodOrder: ['card', 'us_bank_account'],
-        fields: {
-            billingDetails: {
-                name: 'auto',
-                email: 'auto',
-                phone: 'auto',
-                address: 'auto'
-            }
-        }
-    });
-    paymentElement.mount('#payment-element');
-}
-
-initialize();
-
-function showNextActionAlert(message, hostedUrl) {
-    let alertDiv = document.getElementById('next-action-alert');
-    if (!alertDiv) {
-        alertDiv = document.createElement('div');
-        alertDiv.id = 'next-action-alert';
-        alertDiv.className = 'alert alert-warning alert-dismissible fade show';
-        alertDiv.role = 'alert';
-        alertDiv.innerHTML = message + (hostedUrl ? ('<br><a href="' + hostedUrl + '" target="_blank" class="btn btn-primary btn-sm mt-2">Verify Bank Account</a>') : '') + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-        
-        // Find the payment element and insert the alert after it
-        const paymentElement = document.getElementById('payment-element');
-        if (paymentElement && paymentElement.parentNode) {
-            // Insert after the payment element's parent div (which contains the label and form-text)
-            paymentElement.parentNode.parentNode.insertBefore(alertDiv, paymentElement.parentNode.nextSibling);
-        } else {
-            // Fallback: insert at the top of the form
-            const form = document.getElementById('stripe-payment-form');
-            if (form) {
-                form.insertBefore(alertDiv, form.firstChild);
-            }
-        }
-    } else {
-        alertDiv.innerHTML = message + (hostedUrl ? ('<br><a href="' + hostedUrl + '" target="_blank" class="btn btn-primary btn-sm mt-2">Verify Bank Account</a>') : '') + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-        alertDiv.style.display = '';
-    }
-}
-
-document.getElementById('stripe-payment-form')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    // Enhanced validation for payment amount
-    const paymentAmountInput = document.getElementById('payment_amount');
-    const paymentAmount = parseFloat(paymentAmountInput.value) || 0;
-    
-    if (paymentAmount <= 0) {
-        alert('Payment amount must be greater than $0.');
-        paymentAmountInput.focus();
-        return;
-    }
-    
-    // Additional validation - ensure amount is reasonable
-    if (paymentAmount > 100000) {
-        alert('Payment amount exceeds maximum allowed limit of $100,000.');
-        paymentAmountInput.focus();
-        return;
-    }
-    
-    // Update hidden amount field one more time before submission
-    const hiddenAmount = document.getElementById('amount_input');
-    if (hiddenAmount) {
-        hiddenAmount.value = paymentAmount.toFixed(2);
-    }
-    
-    const submitButton = document.getElementById('submit-btn');
-    const originalText = submitButton.innerHTML;
-    submitButton.disabled = true;
-    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    
-    try {
-        // Using new payment method
-        const {error, paymentIntent} = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                return_url: window.location.href
-            },
-            redirect: 'if_required'
-        });
-        
-        if (error) {
-            alert(error.message);
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
-            return;
-        }
-
-        // Handle next_action if present
-        if (paymentIntent && paymentIntent.next_action) {
-            let msg = '';
-            let hostedUrl = null;
-            if (paymentIntent.next_action.type === 'verify_with_microdeposits') {
-                msg = 'Your bank account needs to be verified before the payment can be completed. Please check your bank statement for a code from Stripe, then click the button below to verify your account.';
-                if (paymentIntent.next_action.verify_with_microdeposits && paymentIntent.next_action.verify_with_microdeposits.hosted_verification_url) {
-                    hostedUrl = paymentIntent.next_action.verify_with_microdeposits.hosted_verification_url;
-                }
-            } else {
-                msg = 'Additional action is required to complete your payment: ' + paymentIntent.next_action.type;
-            }
-            showNextActionAlert(msg, hostedUrl);
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
-            return;
-        }
-        
-        document.getElementById('payment_intent_id').value = paymentIntent.id;
-        this.submit();
-    } catch (err) {
-        alert('Error: ' + err.message);
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalText;
-    }
-});
-
 // Prevent typing "-" and "+" in payment amount input field
 function preventSpecialChars(event) {
     const key = event.key;
@@ -778,6 +532,12 @@ if (paymentAmountInput) {
 const overdueItems = {{ overdue_items_json|safe }};
 const currentMonthItems = {{ current_month_items_json|safe }};
 const futureItems = {{ future_items_json|safe }};
+
+// Debug: Log the JavaScript variables
+console.log('JavaScript variables loaded:');
+console.log('overdueItems:', overdueItems);
+console.log('currentMonthItems:', currentMonthItems);
+console.log('futureItems:', futureItems);
 
 function setPaymentAmount(amount) {
     document.getElementById('payment_amount').value = amount.toFixed(2);
@@ -827,5 +587,325 @@ function updateHiddenAmount(input) {
         hiddenAmount.value = amount.toFixed(2);
     }
 }
-</script>
+
+// Initialize hidden amount field on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentAmountInput = document.getElementById('payment_amount');
+    const hiddenAmountInput = document.getElementById('amount_input');
+    
+    if (paymentAmountInput && hiddenAmountInput) {
+        // Sync the hidden field with the payment amount input
+        const amount = parseFloat(paymentAmountInput.value) || 0;
+        hiddenAmountInput.value = amount.toFixed(2);
+    }
+});
+
+// Preview Payment Function
+function previewPayment() {
+    console.log('Preview payment function called');
+    
+    const paymentAmount = parseFloat(document.getElementById('payment_amount').value) || 0;
+    console.log('Payment amount:', paymentAmount);
+    
+         if (paymentAmount <= 0) {
+         alert('Please enter a valid payment amount.');
+         return;
+     }
+    
+    // Get all bill items
+    console.log('Overdue items:', overdueItems);
+    console.log('Current month items:', currentMonthItems);
+    console.log('Future items:', futureItems);
+    
+    const allItems = [
+        ...overdueItems.map(item => ({...item, category: 'overdue'})),
+        ...currentMonthItems.map(item => ({...item, category: 'current'})),
+        ...futureItems.map(item => ({...item, category: 'future'}))
+    ].sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    
+    console.log('All items combined:', allItems);
+    
+    // Calculate payment distribution
+    let remainingPayment = paymentAmount;
+    const paymentDistribution = [];
+    
+    for (const item of allItems) {
+        if (remainingPayment <= 0) break;
+        
+        const amountToPay = Math.min(remainingPayment, item.amount);
+        const remainingAfterPayment = item.amount - amountToPay;
+        
+        paymentDistribution.push({
+            ...item,
+            amountPaid: amountToPay,
+            remainingAfterPayment: remainingAfterPayment,
+            fullyPaid: remainingAfterPayment <= 0
+        });
+        
+        remainingPayment -= amountToPay;
+    }
+    
+         // Generate preview HTML
+     let previewHTML = '';
+     
+     // Add the alert message at the top
+     previewHTML += `
+         <div class="alert alert-info mb-3">
+             <i class="fas fa-info-circle me-2"></i>
+             This preview shows how your payment of <strong id="preview-payment-amount">$${paymentAmount.toFixed(2)}</strong> will be applied to your bills.
+         </div>`;
+     
+     // Group by category
+     const overduePreview = paymentDistribution.filter(item => item.category === 'overdue');
+     const currentPreview = paymentDistribution.filter(item => item.category === 'current');
+     const futurePreview = paymentDistribution.filter(item => item.category === 'future');
+    
+    // Overdue Items
+    if (overduePreview.length > 0) {
+        previewHTML += `
+            <div class="card mb-3 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Overdue Items</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Due Date</th>
+                                    <th class="text-end">Current Balance</th>
+                                    <th class="text-end">Payment Applied</th>
+                                    <th class="text-end">Remaining After Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+        
+        for (const item of overduePreview) {
+            const statusClass = item.fullyPaid ? 'table-success' : 'table-warning';
+            previewHTML += `
+                <tr class="${statusClass}">
+                    <td>${item.description}</td>
+                    <td>${new Date(item.due_date).toLocaleDateString()}</td>
+                    <td class="text-end">$${item.amount.toFixed(2)}</td>
+                    <td class="text-end text-success">$${item.amountPaid.toFixed(2)}</td>
+                    <td class="text-end">$${item.remainingAfterPayment.toFixed(2)}</td>
+                </tr>`;
+        }
+        
+        previewHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+    }
+    
+    // Current Month Items
+    if (currentPreview.length > 0) {
+        previewHTML += `
+            <div class="card mb-3 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Due This Month</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Due Date</th>
+                                    <th class="text-end">Current Balance</th>
+                                    <th class="text-end">Payment Applied</th>
+                                    <th class="text-end">Remaining After Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+        
+        for (const item of currentPreview) {
+            const statusClass = item.fullyPaid ? 'table-success' : 'table-warning';
+            previewHTML += `
+                <tr class="${statusClass}">
+                    <td>${item.description}</td>
+                    <td>${new Date(item.due_date).toLocaleDateString()}</td>
+                    <td class="text-end">$${item.amount.toFixed(2)}</td>
+                    <td class="text-end text-success">$${item.amountPaid.toFixed(2)}</td>
+                    <td class="text-end">$${item.remainingAfterPayment.toFixed(2)}</td>
+                </tr>`;
+        }
+        
+        previewHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+    }
+    
+    // Future Items
+    if (futurePreview.length > 0) {
+        previewHTML += `
+            <div class="card mb-3 border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Future Items</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Due Date</th>
+                                    <th class="text-end">Current Balance</th>
+                                    <th class="text-end">Payment Applied</th>
+                                    <th class="text-end">Remaining After Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+        
+        for (const item of futurePreview) {
+            const statusClass = item.fullyPaid ? 'table-success' : 'table-warning';
+            previewHTML += `
+                <tr class="${statusClass}">
+                    <td>${item.description}</td>
+                    <td>${new Date(item.due_date).toLocaleDateString()}</td>
+                    <td class="text-end">$${item.amount.toFixed(2)}</td>
+                    <td class="text-end text-success">$${item.amountPaid.toFixed(2)}</td>
+                    <td class="text-end">$${item.remainingAfterPayment.toFixed(2)}</td>
+                </tr>`;
+        }
+        
+        previewHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+    }
+    
+    // Summary
+    const totalPaid = paymentDistribution.reduce((sum, item) => sum + item.amountPaid, 0);
+    const totalRemaining = paymentDistribution.reduce((sum, item) => sum + item.remainingAfterPayment, 0);
+    const fullyPaidCount = paymentDistribution.filter(item => item.fullyPaid).length;
+    
+    previewHTML += `
+        <div class="card bg-light">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Total Payment:</strong><br>
+                        <span class="text-success">$${totalPaid.toFixed(2)}</span>
+                    </div>
+                                         <div class="col-md-3">
+                         <strong>Remaining Balance:</strong><br>
+                         <span class="text-danger">$${totalRemaining.toFixed(2)}</span>
+                     </div>
+                    <div class="col-md-3">
+                        <strong>Bills Fully Paid:</strong><br>
+                        <span class="text-info">${fullyPaidCount}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Unused Amount:</strong><br>
+                        <span class="text-muted">$${remainingPayment.toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    // Update the modal content
+    document.getElementById('preview-payment-breakdown').innerHTML = previewHTML;
+    console.log('Modal content updated');
+    
+         // Show the modal
+     const modalElement = document.getElementById('previewPaymentModal');
+     if (modalElement) {
+         // Show modal directly
+         modalElement.style.display = 'block';
+         modalElement.classList.add('show');
+         modalElement.setAttribute('aria-hidden', 'false');
+         
+         // Add backdrop
+         const backdrop = document.createElement('div');
+         backdrop.className = 'modal-backdrop show';
+         backdrop.style.zIndex = '1050';
+         document.body.appendChild(backdrop);
+         
+         // Add body class to prevent scrolling
+         document.body.classList.add('modal-open');
+         document.body.style.overflow = 'hidden';
+         
+         console.log('Modal shown successfully');
+     } else {
+         console.error('Modal element not found');
+     }
+ }
+
+ // Function to close modal properly
+ function closePreviewModal() {
+     const modalElement = document.getElementById('previewPaymentModal');
+     if (modalElement) {
+         modalElement.classList.remove('show');
+         modalElement.style.display = 'none';
+         modalElement.setAttribute('aria-hidden', 'true');
+     }
+     
+     // Remove backdrop
+     const backdrop = document.querySelector('.modal-backdrop');
+     if (backdrop) {
+         backdrop.remove();
+     }
+     
+     // Remove body class and restore scrolling
+     document.body.classList.remove('modal-open');
+     document.body.style.overflow = '';
+     
+     console.log('Modal closed successfully');
+ }
+ 
+ // Add click handler to close modal when clicking outside
+ document.addEventListener('DOMContentLoaded', function() {
+     const modalElement = document.getElementById('previewPaymentModal');
+     if (modalElement) {
+         modalElement.addEventListener('click', function(event) {
+             if (event.target === modalElement) {
+                 closePreviewModal();
+             }
+         });
+     }
+     
+     // Add escape key handler to close modal
+     document.addEventListener('keydown', function(event) {
+         if (event.key === 'Escape') {
+             const modalElement = document.getElementById('previewPaymentModal');
+             if (modalElement && modalElement.classList.contains('show')) {
+                 closePreviewModal();
+             }
+         }
+     });
+   });
+  </script>
+{% endblock %}
+
+{% block modals %}
+<!-- Preview Payment Modal -->
+<div class="modal" id="previewPaymentModal" tabindex="-1" aria-labelledby="previewPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewPaymentModalLabel">
+                    <i class="fas fa-eye me-2"></i>Payment Preview
+                </h5>
+                <button type="button" class="btn-close" onclick="closePreviewModal()" aria-label="Close"></button>
+            </div>
+                         <div class="modal-body">
+                 <div id="preview-payment-breakdown">
+                     <!-- Preview content will be populated by JavaScript -->
+                 </div>
+             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closePreviewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
