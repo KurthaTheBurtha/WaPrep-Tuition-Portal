@@ -2613,7 +2613,7 @@ def student_months(request, student_id):
     # Get all bills for this student with due dates
     all_bills = student.payment_breakdowns.filter(due_date__isnull=False).order_by('due_date')
     
-    # Define the billing cycle: January 2025 to May 2026
+    # Define the billing cycle: January 2025 to June 2026
     billing_cycle_months = []
     
     # Add January 2025 to May 2025
@@ -2628,8 +2628,8 @@ def student_months(request, student_id):
         month_display = f"{calendar.month_name[month]} 2025"
         billing_cycle_months.append((month_key, month_display))
     
-    # Add January 2026 to May 2026
-    for month in range(1, 6):  # January (1) to May (5)
+    # Add January 2026 to June 2026
+    for month in range(1, 7):  # January (1) to June (6)
         month_key = f"2026-{month:02d}"
         month_display = f"{calendar.month_name[month]} 2026"
         billing_cycle_months.append((month_key, month_display))
@@ -4242,7 +4242,7 @@ def payer_view_upcoming_bills(request, student_id):
     
     student = get_object_or_404(Student, id=student_id)
     
-    # Define the billing cycle: June 2025 to May 2026
+    # Define the billing cycle: June 2025 to June 2026
     import calendar
     billing_cycle_months = []
     
@@ -4252,8 +4252,8 @@ def payer_view_upcoming_bills(request, student_id):
         month_display = f"{calendar.month_name[month]} 2025"
         billing_cycle_months.append((month_key, month_display))
     
-    # Add January 2026 to May 2026
-    for month in range(1, 6):  # January (1) to May (5)
+    # Add January 2026 to June 2026
+    for month in range(1, 7):  # January (1) to June (6)
         month_key = f"2026-{month:02d}"
         month_display = f"{calendar.month_name[month]} 2026"
         billing_cycle_months.append((month_key, month_display))
