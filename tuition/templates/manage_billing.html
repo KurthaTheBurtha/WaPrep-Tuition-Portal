@@ -188,12 +188,15 @@
                 <div class="card-header bg-white py-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Student Billing Overview</h5>
-                        <a href="{% url 'download_billing_spreadsheet' %}?search={{ search_query|urlencode }}&sort={{ sort_by|urlencode }}&order={{ sort_order|urlencode }}" 
+                        <!-- Download Spreadsheet button temporarily disabled -->
+                        <!--
+                        <a href="#" 
                            class="btn btn-outline-success" 
                            data-bs-toggle="tooltip" data-bs-placement="top" 
                            title="Download billing spreadsheet">
                             <i class="fas fa-download me-1"></i> Download Spreadsheet
                         </a>
+                        -->
                     </div>
                 </div>
 

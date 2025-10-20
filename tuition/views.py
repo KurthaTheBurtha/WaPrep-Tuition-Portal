@@ -53,6 +53,11 @@ def payer_login(request):
         except User.DoesNotExist:
             user = None
         if user and user.check_password(password) and user.user_type == 'payer':
+            # Check if user is active
+            if not user.is_active:
+                messages.error(request, 'Your account is not active. Please contact an administrator.')
+                return render(request, 'payer_login.html', {'hide_nav_items': True})
+            
             login(request, user)
             if not remember:
                 request.session.set_expiry(0)  # Session expires when browser closes
@@ -75,6 +80,11 @@ def admin_login(request):
         try:
             user = User.objects.get(email=email)
             if user.check_password(password) and user.user_type == 'admin':
+                # Check if user is active
+                if not user.is_active:
+                    messages.error(request, 'Your admin account is not active. Please contact an administrator.')
+                    return render(request, 'admin_login.html', {'hide_nav_items': True})
+                
                 login(request, user)
                 
                 if not remember:
@@ -1467,7 +1477,7 @@ def add_payer_to_student(request):
                         password=temp_password,
                         user_type='payer',
                         user_id=user_id,
-                        is_active=False
+                        is_active=True  # Set to True so users can login immediately
                     )
                     # Note: Activation email will be sent manually via admin interface
             
@@ -3097,7 +3107,8 @@ def manage_billing(request):
     }
     return render(request, 'manage_billing.html', context)
 
-@login_required
+# TEMPORARILY DISABLED - Download spreadsheet functionality
+# @login_required
 def download_billing_spreadsheet(request):
     if request.user.user_type != 'admin':
         messages.error(request, 'You do not have permission to access this page.')
