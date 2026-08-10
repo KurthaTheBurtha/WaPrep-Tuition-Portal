@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tuition App — Database Schema</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 20mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      max-width: 100%;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+      color: #0f3460;
+    }
+    .subtitle {
+      font-size: 11pt;
+      color: #555;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 14pt;
+      color: #0f3460;
+      margin: 22px 0 10px 0;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e8eef5;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 11.5pt;
+      color: #163d6b;
+      margin: 16px 0 8px 0;
+      page-break-after: avoid;
+    }
+    .meta-box {
+      background: #f4f7fb;
+      border: 1px solid #d0dce8;
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 10pt;
+    }
+    .meta-box strong { color: #0f3460; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px 0;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+    th {
+      background: #0f3460;
+      color: #fff;
+      text-align: left;
+      padding: 7px 8px;
+      font-weight: 600;
+    }
+    td {
+      border: 1px solid #dde4ec;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .table-name {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 10pt;
+      background: #e8f0fe;
+      color: #0d47a1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 8pt;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: #eee;
+      color: #333;
+      margin-left: 4px;
+    }
+    .badge.pk { background: #fff3e0; color: #e65100; }
+    .badge.fk { background: #e3f2fd; color: #1565c0; }
+    .badge.uq { background: #f3e5f5; color: #6a1b9a; }
+    .diagram {
+      background: #fafbfc;
+      border: 1px solid #dde4ec;
+      border-radius: 6px;
+      padding: 14px;
+      font-family: ui-monospace, monospace;
+      font-size: 8.5pt;
+      line-height: 1.55;
+      white-space: pre;
+      margin: 10px 0 18px 0;
+      page-break-inside: avoid;
+    }
+    .legend {
+      font-size: 9pt;
+      color: #666;
+      margin-top: 4px;
+    }
+    footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+      font-size: 9pt;
+      color: #777;
+    }
+    .section-intro {
+      color: #444;
+      margin: 0 0 10px 0;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Database Table Structure</h1>
+<p class="subtitle">Tuition management app — Django <code>tuition</code> app</p>
+
+<div class="meta-box">
+  <strong>Source of truth:</strong> <code>tuition/models.py</code><br />
+  <strong>User table:</strong> <code>tuition_user</code> (custom model, <code>AUTH_USER_MODEL = 'tuition.User'</code>)<br />
+  <strong>Default DB (local):</strong> SQLite (<code>db.sqlite3</code>) · <strong>Staging / production:</strong> PostgreSQL<br />
+  <strong>Table naming:</strong> Django default — <code>tuition_</code> + lowercase model name
+</div>
+
+<h2>At a glance — main relationships</h2>
+<p class="section-intro">Students link to payer users through <code>StudentPayer</code>. Payments tie to students (and payers); bill lines use <code>PaymentBreakdown</code> and <code>PaymentItem</code>.</p>
+<div class="diagram">     ┌─────────────┐         ┌──────────────────┐         ┌─────────────┐
+     │ tuition_user│◄────────│tuition_studentpayer│────────►│ tuition_student│
+     │   (payer/   │  payer  │   (link table)       │ student │                │
+     │    admin)   │         └──────────────────────┘         └───────┬───────┘
+     └──────┬──────┘                                                │
+            │                    ┌──────────────────────────────────┼──────────────────┐
+            │                    │                                  │                  │
+            ▼                    ▼                                  ▼                  ▼
+     ┌─────────────┐    ┌─────────────┐              ┌──────────────────┐   ┌─────────────────┐
+     │tuition_bank │    │ tuition_card│              │ tuition_payment  │   │tuition_payment  │
+     │   account   │    │             │              │                  │   │   breakdown     │
+     └─────────────┘    └─────────────┘              └────────┬─────────┘   └────────┬────────┘
+                                                               │                      │
+                                                               └──────► tuition_paymentitem ◄────┘
+                                                                        (allocates $ to bills)</div>
+
+<h2>1. Identity & students</h2>
+
+<h3><span class="table-name">tuition_user</span> — Payers and admins</h3>
+<p class="section-intro">Extends Django <code>AbstractUser</code> (login, names, email, staff flags, etc.) plus app-specific fields.</p>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>username, password, email, first_name, last_name</td><td>Text</td><td>Standard Django auth</td></tr>
+  <tr><td>is_staff, is_active, is_superuser, date_joined, last_login</td><td>Various</td><td>Standard Django auth</td></tr>
+  <tr><td>user_type</td><td>payer | admin</td><td>Role</td></tr>
+  <tr><td>user_id</td><td>Char(30)</td><td><span class="badge uq">Unique</span></td></tr>
+  <tr><td>stripe_customer_id</td><td>Char(64)</td><td>Optional</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_student</span></h3>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>student_id</td><td>Char(100)</td><td><span class="badge uq">Unique</span></td></tr>
+  <tr><td>first_name, last_name</td><td>Char(100)</td><td></td></tr>
+  <tr><td>date_of_birth</td><td>Date</td><td></td></tr>
+  <tr><td>grade</td><td>Integer</td><td>Grade level</td></tr>
+  <tr><td>status</td><td>active | inactive</td><td>Default: active</td></tr>
+  <tr><td>notes</td><td>Text</td><td>Admin notes</td></tr>
+  <tr><td>current_balance</td><td>Decimal(10,2)</td><td>Default 0.00</td></tr>
+  <tr><td>due_date</td><td>Date</td><td>Optional</td></tr>
+  <tr><td>created_at, updated_at</td><td>DateTime</td><td>Auto</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_studentpayer</span> — Student ↔ payer link</h3>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>student_id</td><td>FK → student</td><td><span class="badge fk">FK</span> CASCADE</td></tr>
+  <tr><td>payer_id</td><td>FK → user</td><td><span class="badge fk">FK</span> CASCADE</td></tr>
+  <tr><td>relationship</td><td>mother | father | guardian | other</td><td></td></tr>
+  <tr><td>is_primary</td><td>Boolean</td><td>Default false</td></tr>
+  <tr><td>created_at, updated_at</td><td>DateTime</td><td></td></tr>
+  <tr><td colspan="3"><strong>Unique together:</strong> (student, payer)</td></tr>
+</table>
+
+<h2>2. Payments & billing</h2>
+
+<h3><span class="table-name">tuition_payment</span></h3>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>student_id</td><td>FK → student</td><td><span class="badge fk">FK</span></td></tr>
+  <tr><td>payer_id</td><td>FK → user</td><td>Optional</td></tr>
+  <tr><td>amount</td><td>Decimal(10,2)</td><td></td></tr>
+  <tr><td>payment_date</td><td>DateTime</td><td></td></tr>
+  <tr><td>status</td><td>pending | completed | failed</td><td></td></tr>
+  <tr><td>payment_method</td><td>Char(50)</td><td>e.g. cash, check</td></tr>
+  <tr><td>notes</td><td>Text</td><td>Admin notes</td></tr>
+  <tr><td>bank_account_id</td><td>FK → bankaccount</td><td>Optional, PROTECT</td></tr>
+  <tr><td>routing_number, account_number, account_type</td><td>Text</td><td>Legacy / snapshot</td></tr>
+  <tr><td>submitted_at</td><td>DateTime</td><td>Auto on create</td></tr>
+  <tr><td>receipt_number</td><td>Char(50)</td><td><span class="badge uq">Unique</span></td></tr>
+  <tr><td>currency</td><td>Char(3)</td><td>Default USD</td></tr>
+  <tr><td>exchange_rate, exchange_rate_date</td><td>Decimal / DateTime</td><td>FX</td></tr>
+  <tr><td>original_amount, original_currency</td><td>Decimal / Char(3)</td><td>FX</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_paymentbreakdown</span> — Bill line items</h3>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>student_id</td><td>FK → student</td><td></td></tr>
+  <tr><td>description</td><td>Char(255)</td><td></td></tr>
+  <tr><td>amount, currency</td><td>Decimal / Char(3)</td><td></td></tr>
+  <tr><td>due_date, date_incurred, late_date</td><td>Date</td><td>late_date auto if omitted</td></tr>
+  <tr><td>is_paid</td><td>Boolean</td><td></td></tr>
+  <tr><td>payment_status_override</td><td>unpaid | partially_paid | paid</td><td>Manual override</td></tr>
+  <tr><td>show_in_payment_history</td><td>Boolean</td><td></td></tr>
+  <tr><td>created_at, updated_at</td><td>DateTime</td><td></td></tr>
+</table>
+
+<h3><span class="table-name">tuition_paymentitem</span> — Payment applied to a bill line</h3>
+<table>
+  <tr><th>Column</th><th>Type / values</th><th>Notes</th></tr>
+  <tr><td>id</td><td>BigInt</td><td><span class="badge pk">PK</span></td></tr>
+  <tr><td>payment_id</td><td>FK → payment</td><td></td></tr>
+  <tr><td>breakdown_item_id</td><td>FK → paymentbreakdown</td><td></td></tr>
+  <tr><td>amount_paid, currency</td><td>Decimal / Char(3)</td><td></td></tr>
+  <tr><td>created_at</td><td>DateTime</td><td></td></tr>
+  <tr><td colspan="3"><strong>Unique together:</strong> (payment, breakdown_item)</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_paymentreceipt</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>payment_id</td><td>OneToOne → payment</td></tr>
+  <tr><td>file</td><td>Uploaded file path</td></tr>
+  <tr><td>generated_at</td><td>DateTime</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_paymentreminder</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>payment_id</td><td>FK → payment</td></tr>
+  <tr><td>reminder_date, sent, sent_at, created_at</td><td>Reminder tracking</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_paymentplan</span> & <span class="table-name">tuition_paymentinstallment</span></h3>
+<table>
+  <tr><th>Table</th><th>Main columns</th></tr>
+  <tr><td>paymentplan</td><td>student_id, total_amount, number_of_installments, start_date, end_date, status, timestamps</td></tr>
+  <tr><td>paymentinstallment</td><td>payment_plan_id, amount, due_date, payment_id (OneToOne, optional), status, timestamps</td></tr>
+</table>
+
+<h2>3. Payment methods & vendors</h2>
+
+<h3><span class="table-name">tuition_bankaccount</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>user_id</td><td>FK → user</td></tr>
+  <tr><td>nickname, account_type</td><td>checking | savings</td></tr>
+  <tr><td>last4, provider_token</td><td>Tokenized; not full account number</td></tr>
+  <tr><td>stripe_payment_method_id, created_at</td><td></td></tr>
+</table>
+
+<h3><span class="table-name">tuition_card</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>user_id</td><td>FK → user</td></tr>
+  <tr><td>nickname, last4, brand, exp_month, exp_year</td><td></td></tr>
+  <tr><td>stripe_payment_method_id, created_at</td><td></td></tr>
+</table>
+
+<h3><span class="table-name">tuition_vendor</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>name, email, bill_vendor_id</td><td>External billing integration</td></tr>
+</table>
+
+<h2>4. Onboarding & account security</h2>
+
+<h3><span class="table-name">tuition_accountrequest</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>first_name, last_name, child_first_name, child_last_name</td><td>Applicant info</td></tr>
+  <tr><td>email, student_names, submitted_at</td><td></td></tr>
+</table>
+
+<h3><span class="table-name">tuition_passwordreset</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>user_id, token (unique), created_at, used</td><td>Token expires after 24h (app logic)</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_passwordhistory</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>user_id, password_hash, created_at</td><td>Last 5 passwords kept (app logic)</td></tr>
+</table>
+
+<h2>5. Audit, versioning & operations</h2>
+
+<h3><span class="table-name">tuition_auditlog</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>timestamp, action, model_name, record_id</td><td>CREATE, UPDATE, DELETE, LOGIN, etc.</td></tr>
+  <tr><td>user_id, user_ip, user_agent</td><td>Who / where</td></tr>
+  <tr><td>field_name, old_value, new_value, description</td><td>Change detail</td></tr>
+  <tr><td>metadata, session_id, request_id</td><td>JSON (or text on SQLite)</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_dataversion</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>model_name, record_id, version_number</td><td>Unique together</td></tr>
+  <tr><td>data_snapshot, created_at, created_by_id</td><td>Full record snapshot</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_systemhealth</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>timestamp, component, status, message, metrics</td><td>HEALTHY / WARNING / CRITICAL</td></tr>
+</table>
+
+<h3><span class="table-name">tuition_securityevent</span></h3>
+<table>
+  <tr><th>Column</th><th>Notes</th></tr>
+  <tr><td>timestamp, event_type, severity, description</td><td>Security alerts</td></tr>
+  <tr><td>user_id, user_ip, user_agent, metadata</td><td></td></tr>
+  <tr><td>resolved, resolved_at, resolved_by_id</td><td>Resolution tracking</td></tr>
+</table>
+
+<h2>6. Django framework tables (also present)</h2>
+<p class="section-intro">Standard Django apps create additional tables, for example: <code>django_session</code>, <code>django_admin_log</code>, <code>django_content_type</code>, <code>auth_group</code>, <code>auth_permission</code>, and join tables for user groups/permissions.</p>
+
+<p class="legend"><span class="badge pk">PK</span> Primary key &nbsp; <span class="badge fk">FK</span> Foreign key &nbsp; <span class="badge uq">Unique</span> Unique constraint</p>
+
+<footer>
+  Generated from repository schema · Regenerate: open <code>docs/database-schema.html</code> in Chrome → Print → Save as PDF, or run the project’s PDF build script if added.
+</footer>
+
+</body>
+</html>
